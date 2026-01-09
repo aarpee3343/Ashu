@@ -3,6 +3,12 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({
+      message: "Database will be connected after deployment",
+      status: "setup-required"
+    });
+  }
   try {
     const body = await req.json();
     const { name, email, password, category, price, experience, bio, image } = body;
