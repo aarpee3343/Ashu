@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. User Model
+model User {
+  id         Int         @id @default(autoincrement())
+  name       String
+  email      String      @unique
+  password   String
+  phone      String?
+  address    String?
+  gender     String?
+  role       Role        @default(USER)
+  
+  bookings   Booking[]
+  vitals     Vital[]
+  reviews    Review[]
+  specialist Specialist? // Relation to Specialist profile
+  
+  createdAt  DateTime    @default(now())
+}
+
+// 2. Specialist Model
+model Specialist {
+  id             Int      @id @default(autoincrement())
+  name           String
+  category       Category
+  bio            String   @db.Text
+  qualifications String?  @db.Text 
+  hospitals      String?  @db.Text 
+  experience     Int
+  price          Int
+  image          String
+  isFeatured     Boolean  @default(false)
+  isPopular      Boolean  @default(false)
+  bankAccount   BankAccount?
+  payouts       PayoutRequest[]
+  
+  // Verification & Financials
+  isVerified     Boolean  @default(false) 
+  commissionRate Float    @default(20.0)  
+
+  // Relations
+  userId         Int?     @unique 
+  user           User?    @relation(fields: [userId], references: [id])
+  
+  slots          Slot[]
+  bookings       Booking[]
+  clinics        Clinic[] 
+  reviews        Review[]
+}
+
+// 3. Clinic Model (New)
+model Clinic {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  name         String     
+  roomNumber   String?
+  address      String
+  district     String
+  city         String
+  state        String
+  pincode      String
+  
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+  bookings     Booking[]
+}
+
+// 4. Booking Model (Merged & Corrected)
+model Booking {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  specialistId Int
+  
+  // Schedule
+  date         DateTime 
+  slotTime     String   
+  duration     Int      @default(1)
+  
+  // Location Logic
+  locationType String   @default("CLINIC") // "CLINIC" or "HOME"
+  visitAddress String?  // For Home Visit
+  clinicId     Int?     // For Clinic Visit
+  
+  // Financials
+  totalPrice   Int
+  amountPaid   Int      @default(0)
+  paymentType  String   @default("PAY_ON_SERVICE")
+  platformFee  Int      @default(0) 
+  
+  status       BookingStatus @default(UPCOMING)
+  createdAt    DateTime      @default(now())
+  
+  // Medical Data
+  doctorNotes  String?  @db.Text
+  prescription String?  @db.Text
+  medicalCondition String? @db.Text
+  medicalDocs      String? @db.Text // URL to uploaded file
+
+  // Relations
+  user         User       @relation(fields: [userId], references: [id])
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+  clinic       Clinic?    @relation(fields: [clinicId], references: [id])
+  dailyLogs    DailyLog[] 
+  review       Review?
+}
+
+// 5. DailyLog Model (For tracking multi-day visits)
+model DailyLog {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  date      DateTime 
+  status    String   @default("PENDING") // PENDING, COMPLETED, SKIPPED
+  note      String?  
+  
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+}
+
+// 6. Review Model
+model Review {
+  id           Int      @id @default(autoincrement())
+  rating       Int      
+  comment      String
+  userId       Int
+  specialistId Int
+  bookingId    Int      @unique 
+  createdAt    DateTime @default(now())
+
+  user         User       @relation(fields: [userId], references: [id])
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+  booking      Booking    @relation(fields: [bookingId], references: [id])
+}
+
+// 7. Slot Model
+model Slot {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  date         DateTime
+  startTime    String
+  endTime      String
+  isBooked     Boolean    @default(false)
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+}
+
+// 8. Vital Model
+model Vital {
+  id     Int    @id @default(autoincrement())
+  userId Int
+  type   String
+  value  String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+  SPECIALIST
+}
+
+enum Category {
+  PHYSIOTHERAPIST
+  NUTRITIONIST
+  SPEECH_THERAPIST
+  DIETITIAN
+}
+
+enum BookingStatus {
+  UPCOMING
+  COMPLETED
+  CANCELLED
+}
+
+// Track Payouts
+model PayoutRequest {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  amount       Int
+  status       String     @default("PENDING") // PENDING, PAID, REJECTED
+  createdAt    DateTime   @default(now())
+  
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+}
+
+
+// Bank Details for Payouts
+model BankAccount {
+  id            Int        @id @default(autoincrement())
+  specialistId  Int        @unique
+  accountHolder String
+  accountNumber String
+  bankName      String
+  ifscCode      String
+  
+  specialist    Specialist @relation(fields: [specialistId], references: [id])
+}
