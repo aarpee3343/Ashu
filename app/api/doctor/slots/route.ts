@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { date, time, action } = body; 
 
-  const specialist = await prisma.specialist.findUnique({ where: { userId: Number(session.user.id) } });
+  const specialist = await prisma.specialist.findUnique({ where: { userId: Number((session.user as any).id) } });
 
   if (action === "BLOCK") {
     // Check if already blocked to avoid duplicates
@@ -50,7 +50,7 @@ export async function DELETE(req: Request) {
   
   const body = await req.json();
   const { date } = body;
-  const specialist = await prisma.specialist.findUnique({ where: { userId: Number(session.user.id) } });
+  const specialist = await prisma.specialist.findUnique({ where: { userId: Number((session.user as any).id) } });
 
   // Clear all manual blocks for this day
   await prisma.slot.deleteMany({

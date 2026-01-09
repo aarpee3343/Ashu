@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   if (!session || !session.user) return NextResponse.json({ error: "Auth required" }, { status: 401 });
 
   const body = await req.json();
-  const specialist = await prisma.specialist.findUnique({ where: { userId: Number(session.user.id) } });
+  const specialist = await prisma.specialist.findUnique({ where: { userId: Number((session.user as any).id) } });
 
   if (!specialist) return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
 

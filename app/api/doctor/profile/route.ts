@@ -16,7 +16,7 @@ export async function PATCH(req: Request) {
 
     // 3. Database Update
     const updated = await prisma.specialist.update({
-      where: { userId: Number(session.user.id) },
+      where: { userId: Number((session.user as any).id) },
       data: {
         bio: body.bio,
         price: Number(body.price),

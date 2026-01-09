@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
   // Now TypeScript knows session.user is defined
   const specialist = await prisma.specialist.findUnique({ 
-    where: { userId: Number(session.user.id) } 
+    where: { userId: Number((session.user as any).id) }
   });
 
   if (!specialist) return NextResponse.json({ error: "No profile" }, { status: 404 });

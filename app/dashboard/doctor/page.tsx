@@ -20,7 +20,7 @@ export default async function DoctorDashboard() {
   }
 
   const specialist = await prisma.specialist.findFirst({
-    where: { userId: Number(session.user.id) },
+    where: { userId: Number((session.user as any).id) },
     include: {
       bookings: {
         include: { 
