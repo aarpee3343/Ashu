@@ -5,14 +5,19 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  
+  // FIX 1: Check if session OR session.user is missing
+  if (!session || !session.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { type, value } = await req.json();
 
   // Create new vital
   const vital = await prisma.vital.create({
     data: {
-      userId: Number(session.user.id),
+      // FIX 2: Cast (session.user as any) to fix TypeScript error
+      userId: Number((session.user as any).id),
       type,
       value
     }
