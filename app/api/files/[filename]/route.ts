@@ -14,14 +14,15 @@ export async function GET(req: Request, { params }: { params: { filename: string
   try {
     const fileBuffer = await decryptFile(params.filename);
     
-    // Return file as a stream (PDF/Image)
-    return new NextResponse(fileBuffer, {
+    // FIX: Cast fileBuffer to 'any' to satisfy TypeScript strict check
+    return new NextResponse(fileBuffer as any, {
       headers: {
         "Content-Type": "application/pdf", // Or detect mime type dynamically
         "Content-Disposition": `inline; filename="${params.filename}"`
       }
     });
   } catch (e) {
+    console.error(e);
     return new NextResponse("File not found or corrupted", { status: 404 });
   }
 }
