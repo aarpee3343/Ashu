@@ -1,14 +1,13 @@
+// app/api/admin/create-specialist/route.ts
+
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  if (!process.env.DATABASE_URL) {
-    return NextResponse.json({
-      message: "Database will be connected after deployment",
-      status: "setup-required"
-    });
-  }
   try {
     const body = await req.json();
     const { name, email, password, category, price, experience, bio, image } = body;
@@ -48,9 +47,23 @@ export async function POST(req: Request) {
       });
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      message: "Specialist created successfully" 
+    });
+    
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to create doctor" }, { status: 500 });
+    console.error('Create specialist error:', error);
+    
+    // Better error response
+    return NextResponse.json(
+      { 
+        error: "Failed to create specialist",
+        details: process.env.NODE_ENV === 'development' ? 
+          (error instanceof Error ? error.message : 'Unknown error') : 
+          undefined
+      }, 
+      { status: 500 }
+    );
   }
 }

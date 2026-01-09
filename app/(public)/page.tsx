@@ -10,7 +10,7 @@ export default async function Home() {
   const featured = specialists.filter((s: any) => s.isFeatured).slice(0, 3);
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50/50 pt-20">
+    <div className="flex flex-col min-h-screen bg-gray-50/50 pt-2">
       
       {/* 1. HERO SECTION */}
       <section className="relative bg-white pt-20 pb-32 overflow-hidden">

@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Private Uploads (Your local medical docs folder)
 /private-uploads
+
+/prisma/seed.ts
