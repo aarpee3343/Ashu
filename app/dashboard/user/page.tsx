@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth"; 
+import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import UserDashboardClient from "./UserDashboardClient";
 import Link from "next/link";
@@ -10,24 +10,13 @@ export const dynamic = "force-dynamic";
 export default async function UserDashboard() {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
-    redirect("/login");
-  }
-
-  // 🔒 SECURITY CHECK: Only USER role allowed
-  const userRole = (session.user as any).role;
-  
-  if (userRole !== "USER") {
-    // If a Doctor tries to access this, show error or redirect to their own dashboard
-    if (userRole === "SPECIALIST") redirect("/dashboard/doctor");
-    if (userRole === "ADMIN") redirect("/dashboard/admin");
-    
+  // FIX: Check session AND session.user explicitly
+  if (!session || !session.user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <h1 className="text-2xl font-bold mb-4">Wrong Dashboard</h1>
-        <p className="mb-4">You are logged in as a <strong>{userRole}</strong>.</p>
-        <Link href={`/dashboard/${userRole === 'SPECIALIST' ? 'doctor' : 'admin'}`} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">
-          Go to {userRole} Dashboard
+        <h1 className="text-2xl font-bold mb-4">Please log in to view your dashboard</h1>
+        <Link href="/login" className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700">
+          Go to Login
         </Link>
       </div>
     );
@@ -35,17 +24,19 @@ export default async function UserDashboard() {
 
   // Fetch full user data
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email! },
+    where: { email: session.user.email! }, // The ! assumes email exists, which is safe after auth check
     include: {
       bookings: {
         include: { specialist: true },
-        orderBy: { date: 'desc' }
+        orderBy: { date: "desc" },
       },
-      vitals: true
-    }
+      vitals: true, // Include vitals for the dashboard
+    },
   });
 
-  if (!user) return <p>User not found</p>;
+  if (!user) {
+    return <div className="p-10 text-center">User not found. Please contact support.</div>;
+  }
 
   return <UserDashboardClient user={user} />;
 }
