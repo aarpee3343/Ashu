@@ -139,6 +139,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="flex-1 w-full pt-0">
               {children}
             </main>
+            {/* FIXED: Remove invalid theme property */}
             <Toaster 
               position="top-right"
               toastOptions={{
@@ -149,9 +150,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 },
                 success: {
                   duration: 3000,
-                  theme: {
-                    primary: 'green',
-                    secondary: 'black',
+                  style: {
+                    background: '#10B981', // Green background for success
+                    color: '#fff',
+                  },
+                },
+                error: {
+                  duration: 4000,
+                  style: {
+                    background: '#EF4444', // Red background for error
+                    color: '#fff',
                   },
                 },
               }}
