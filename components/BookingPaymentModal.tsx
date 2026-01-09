@@ -94,12 +94,18 @@ export default function BookingPaymentModal({
   };
 
   const handleConfirmBooking = async () => {
+    // FIX: Explicit safety check for session and user
+    if (!session || !session.user) {
+        toast.error("You must be logged in.");
+        return;
+    }
+
     setIsProcessing(true);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
         body: JSON.stringify({
-          userId: session.user.id,
+          userId: (session.user as any).id, // FIX: Cast to 'any' to avoid TS error
           specialistId: specialist.id,
           date: date,
           slotTime: slot,
