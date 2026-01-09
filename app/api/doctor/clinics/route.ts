@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Auth required" }, { status: 401 });
+  if (!session || !session.user) return NextResponse.json({ error: "Auth required" }, { status: 401 });
 
   const body = await req.json();
   const specialist = await prisma.specialist.findUnique({ where: { userId: Number(session.user.id) } });
