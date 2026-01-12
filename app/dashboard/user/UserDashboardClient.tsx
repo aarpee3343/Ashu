@@ -1,462 +1,400 @@
 "use client";
 
 import { useState } from "react";
+import { 
+  Calendar, CreditCard, User, Users, FileText, 
+  MapPin, Clock, Eye, Download, Activity, X, 
+  Plus, Save, ChevronRight, CheckCircle, Loader2 
+} from "lucide-react"; // ✅ Fixed: Added 'X' and others
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generatePrescriptionPDF } from "@/lib/pdfGenerator";
 
 export default function UserDashboardClient({ user }: any) {
   const router = useRouter();
-
-  /* =========================
-      TAB STATE
-   ========================== */
-  const [activeTab, setActiveTab] = useState<
-    "APPOINTMENTS" | "PAYMENTS" | "PROFILE"
-  >("APPOINTMENTS");
-
-  /* =========================
-      PAYMENT MODAL STATE
-   ========================== */
-  const [payModalOpen, setPayModalOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  /* =========================
-      PROFILE STATE
-   ========================== */
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    name: user.name,
-    phone: user.phone || "",
-    address: user.address || "",
-    gender: user.gender || "Not Specified",
-  });
-
-  /* =========================
-      VITALS STATE (NEW)
-   ========================== */
-  const [vitals, setVitals] = useState(user.vitals || []);
-  const [isAddingVital, setIsAddingVital] = useState(false);
-  const [newVital, setNewVital] = useState({ type: "", value: "" });
-
-  /* =========================
-      ACTIONS
-   ========================== */
+  const [activeTab, setActiveTab] = useState("APPOINTMENTS");
   
-  // 1. PROFILE UPDATE
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Profile updated successfully!");
-    setIsEditing(false);
+  // Modal States
+  const [selectedBooking, setSelectedBooking] = useState<any>(null); // Details
+  const [payModalData, setPayModalData] = useState<any>(null); // Pay Balance
+  const [showFamilyModal, setShowFamilyModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Data States
+  const [familyMembers, setFamilyMembers] = useState(user.familyMembers || []);
+  const [vitals, setVitals] = useState(user.vitals?.[0] || {}); // Assume 1 vital record for now
+  
+  // Forms
+  const [profileData, setProfileData] = useState({ 
+    phone: user.phone || "", age: user.age || "", gender: user.gender || "Male", address: user.address || "" 
+  });
+  const [newMember, setNewMember] = useState({ name: "", relation: "", age: "", gender: "Male" });
+  const [vitalForm, setVitalForm] = useState({
+    weight: vitals.value?.split('|')[0] || "",
+    height: vitals.value?.split('|')[1] || "",
+    bp: vitals.value?.split('|')[2] || "",
+    sugar: vitals.value?.split('|')[3] || "",
+    bloodGroup: vitals.type || ""
+  });
+  const [utrInput, setUtrInput] = useState("");
+
+  // --- ACTIONS ---
+
+  const handleUpdateProfile = async () => {
+    setLoading(true);
+    await fetch("/api/user/profile", { method: "PATCH", body: JSON.stringify(profileData) });
+    toast.success("Profile Updated");
+    router.refresh();
+    setLoading(false);
   };
 
-  // 2. CANCEL BOOKING
-  const handleCancel = async (bookingId: number) => {
-    if (!confirm("Are you sure you want to cancel this appointment?")) return;
-
+  const handleAddFamily = async () => {
+    if(!newMember.name) return toast.error("Name is required");
+    setLoading(true);
+    
     try {
-      const res = await fetch(`/api/bookings/${bookingId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action: "CANCEL" }),
-      });
-
-      if (!res.ok) throw new Error("Failed");
-
-      toast.success("Appointment cancelled");
-      router.refresh();
-    } catch {
-      toast.error("Could not cancel");
-    }
-  };
-
-  // 3. RESCHEDULE
-  const handleReschedule = async (booking: any) => {
-    if (!confirm("To reschedule, we need to cancel this appointment and book a new one. Proceed?")) return;
-
-    await handleCancel(booking.id);
-    router.push(`/specialists/${booking.specialistId}`);
-  };
-
-  // 4. PAYMENTS
-  const openPayModal = (booking: any) => {
-    setSelectedBooking(booking);
-    setPayModalOpen(true);
-  };
-
-  const processBalancePayment = async () => {
-    setIsProcessing(true);
-    try {
-      const res = await fetch(`/api/bookings/${selectedBooking.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action: "PAY_BALANCE" }),
-      });
-
-      if (!res.ok) throw new Error("Failed");
-
-      toast.success("Payment Successful!");
-      setPayModalOpen(false);
-      router.refresh();
-    } catch {
-      toast.error("Payment failed");
+        const res = await fetch("/api/user/family", { 
+            method: "POST", 
+            body: JSON.stringify(newMember) 
+        });
+        
+        if(res.ok) {
+            const addedMember = await res.json(); // Get the created member from backend
+            
+            // ✅ FIX 2: Manually update local state immediately
+            setFamilyMembers([...familyMembers, addedMember]); 
+            
+            toast.success("Member Added"); 
+            setShowFamilyModal(false);
+            
+            // Optional: clear form
+            setNewMember({ name: "", relation: "", age: "", gender: "Male" });
+            
+            router.refresh(); 
+        } else {
+            toast.error("Failed to add member");
+        }
+    } catch (e) {
+        toast.error("Something went wrong");
     } finally {
-      setIsProcessing(false);
+        setLoading(false);
     }
   };
 
-  // 5. VITALS ACTIONS (NEW)
-  const handleAddVital = async () => {
-    if (!newVital.type || !newVital.value) return;
+  const handleSaveVitals = async () => {
+    setLoading(true);
+    // Combine vitals into a single string or distinct fields based on your schema
+    // Here we use a pipe delimiter for simplicity in one "value" field, or mapped to DB
+    const valueString = `${vitalForm.weight}|${vitalForm.height}|${vitalForm.bp}|${vitalForm.sugar}`;
+    
+    await fetch("/api/user/vitals", { 
+        method: "POST", 
+        body: JSON.stringify({ type: vitalForm.bloodGroup || "General", value: valueString }) 
+    });
+    toast.success("Vitals Logged");
+    router.refresh();
+    setLoading(false);
+  };
 
-    const res = await fetch("/api/user/vitals", {
-      method: "POST",
-      body: JSON.stringify(newVital),
+  const handlePayBalance = async () => {
+    if(utrInput.length < 5) return toast.error("Invalid UTR");
+    setLoading(true);
+    
+    // Simulate API call to update payment
+    await fetch(`/api/bookings/${payModalData.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "PAY_BALANCE", transactionId: utrInput })
     });
 
-    const savedVital = await res.json();
-    setVitals([...vitals, savedVital]);
-    setNewVital({ type: "", value: "" });
-    setIsAddingVital(false);
+    toast.success("Payment Recorded");
+    setPayModalData(null);
+    router.refresh();
+    setLoading(false);
   };
 
-  const handleDeleteVital = async (id: number) => {
-    await fetch(`/api/user/vitals?id=${id}`, { method: "DELETE" });
-    setVitals(vitals.filter((v: any) => v.id !== id));
-  };
-
-  // 6. PDF INVOICE
-  const downloadInvoice = (booking: any) => {
-    const doc = new jsPDF();
-
-    doc.setFontSize(20);
-    doc.text("INVOICE", 14, 22);
-
-    doc.setFontSize(10);
-    doc.text(`Invoice #: INV-${booking.id}`, 14, 30);
-    doc.text(`Date: ${format(new Date(), "yyyy-MM-dd")}`, 14, 35);
-
-    doc.text("HealthPlatform Inc.", 150, 22);
-    doc.text("healthplatform.com", 150, 27);
-    doc.text("support@healthplatform.com", 150, 32);
-
-    doc.text("Bill To:", 14, 50);
-    doc.setFontSize(12);
-    doc.text(user.name, 14, 56);
-    doc.setFontSize(10);
-    doc.text(user.email, 14, 61);
-
-    autoTable(doc, {
-      startY: 70,
-      head: [["Description", "Doctor", "Date", "Amount"]],
-      body: [
-        [
-          "Medical Consultation",
-          `Dr. ${booking.specialist.name}`,
-          format(new Date(booking.date), "dd MMM yyyy"),
-          `INR ${booking.totalPrice}`,
-        ],
-      ],
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.text(`Total Amount: INR ${booking.totalPrice}`, 140, finalY);
-    doc.text(`Paid Amount: INR ${booking.amountPaid}`, 140, finalY + 5);
-    doc.text(
-      `Balance Due: INR ${booking.totalPrice - booking.amountPaid}`,
-      140,
-      finalY + 12
-    );
-
-    doc.save(`Invoice_${booking.id}.pdf`);
-  };
-
-  /* =========================
-      RENDER
-   ========================== */
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen bg-gray-50 pb-24">
+      
       {/* HEADER */}
-      <div className="bg-white border-b pt-24 pb-8 px-4 sm:px-8">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-            <p className="text-gray-500 mt-1">Welcome back, {user.name}</p>
-          </div>
-          <div className="flex bg-gray-100 p-1 rounded-lg">
-            {["APPOINTMENTS", "PAYMENTS", "PROFILE"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
-                  activeTab === tab
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+      <div className="bg-white px-6 pt-12 pb-6 rounded-b-[30px] shadow-sm sticky top-0 z-20">
+        <h1 className="text-2xl font-bold text-gray-900">Hello, {user.name}</h1>
+        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Dashboard</p>
+      </div>
+
+      {/* TABS */}
+      <div className="px-4 mt-6">
+        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm overflow-x-auto no-scrollbar gap-1">
+          {[
+            { id: "APPOINTMENTS", icon: Calendar, label: "Bookings" },
+            { id: "FINANCE", icon: CreditCard, label: "Payments" },
+            { id: "RECORDS", icon: FileText, label: "Records" },
+            { id: "PROFILE", icon: User, label: "Profile" },
+          ].map((tab) => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 py-3 min-w-[80px] rounded-xl flex flex-col items-center gap-1 transition-all ${activeTab === tab.id ? "bg-black text-white" : "text-gray-400 hover:bg-gray-50"}`}
+            >
+              <tab.icon size={18} />
+              <span className="text-[9px] font-bold uppercase">{tab.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-8 mt-8">
-
-        {/* ================= APPOINTMENTS TAB (RESTORED) ================= */}
+      {/* CONTENT */}
+      <div className="px-4 mt-6 space-y-4">
+        
+        {/* --- 1. BOOKINGS TAB --- */}
         {activeTab === "APPOINTMENTS" && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-bold text-gray-800">Upcoming Appointments</h2>
-            {user.bookings.filter((b: any) => b.status === 'UPCOMING').length === 0 ? (
-               <div className="bg-white p-8 rounded-xl text-center border border-gray-200">
-                 <p className="text-gray-500">No upcoming appointments.</p>
-                 <a href="/specialists" className="text-blue-600 font-bold hover:underline mt-2 inline-block">Book Now</a>
-               </div>
-            ) : (
-               user.bookings.filter((b: any) => b.status === 'UPCOMING').map((booking: any) => (
-                 <div key={booking.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex gap-4 items-center">
-                      <div className="bg-blue-50 text-blue-600 font-bold p-3 rounded-lg text-center min-w-[60px]">
-                        <span className="block text-xl">{format(new Date(booking.date), 'd')}</span>
-                        <span className="text-xs uppercase">{format(new Date(booking.date), 'MMM')}</span>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-lg">{booking.specialist.name}</h3>
-                        <p className="text-sm text-gray-500">
-                          {booking.specialist.category} • {booking.slotTime}
-                          {booking.locationType === 'HOME' && <span className="ml-2 bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">HOME VISIT</span>}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3 w-full md:w-auto">
-                       <button onClick={() => handleCancel(booking.id)} className="flex-1 md:flex-none px-4 py-2 border border-red-200 text-red-600 font-semibold rounded-lg hover:bg-red-50 text-sm">Cancel</button>
-                       <button onClick={() => handleReschedule(booking)} className="flex-1 md:flex-none px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-sm">Reschedule</button>
-                    </div>
-                 </div>
-               ))
-            )}
-            
-            <h2 className="text-xl font-bold text-gray-800 mt-10">History & Cancelled</h2>
-            <div className="opacity-70 space-y-4">
-              {user.bookings.filter((b: any) => b.status !== 'UPCOMING').map((booking: any) => (
-                 <div key={booking.id} className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex justify-between items-center">
-                   <div>
-                     <p className="font-bold text-gray-700">{booking.specialist.name}</p>
-                     <p className="text-xs text-gray-500">{format(new Date(booking.date), 'dd MMM yyyy')} • {booking.status}</p>
-                   </div>
-                   {booking.status === 'COMPLETED' && (
-                     <button onClick={() => downloadInvoice(booking)} className="text-xs text-blue-600 underline">Download Invoice</button>
-                   )}
-                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ================= PAYMENTS TAB (RESTORED) ================= */}
-        {activeTab === "PAYMENTS" && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="p-4 font-semibold text-gray-600 text-sm">Doctor</th>
-                  <th className="p-4 font-semibold text-gray-600 text-sm">Status</th>
-                  <th className="p-4 font-semibold text-gray-600 text-sm text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {user.bookings.map((b: any) => {
-                  const balance = b.totalPrice - b.amountPaid;
-                  return (
-                    <tr key={b.id}>
-                      <td className="p-4">
-                        <div className="font-medium text-gray-900">{b.specialist.name}</div>
-                        <div className="text-xs text-gray-500">{format(new Date(b.date), 'dd MMM')}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm">Paid: ₹{b.amountPaid} / <span className="text-gray-400">₹{b.totalPrice}</span></div>
-                        {balance > 0 ? <span className="text-xs font-bold text-red-600">Due: ₹{balance}</span> : <span className="text-xs font-bold text-green-600">Fully Paid</span>}
-                      </td>
-                      <td className="p-4 text-right">
-                        {balance > 0 && b.status !== 'CANCELLED' ? (
-                          <button onClick={() => openPayModal(b)} className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-green-700">Pay Balance</button>
-                        ) : (
-                          <button onClick={() => downloadInvoice(b)} className="border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-50">Invoice</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ================= PROFILE TAB ================= */}
-        {activeTab === "PROFILE" && (
-          <div className="bg-white p-8 rounded-xl border border-gray-200 max-w-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">Personal Information</h2>
-              <button
-                onClick={() => setIsEditing(!isEditing)}
-                className="text-blue-600 font-semibold hover:underline"
-              >
-                {isEditing ? "Cancel" : "Edit Profile"}
-              </button>
-            </div>
-
-            <form onSubmit={handleProfileUpdate} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  disabled={!isEditing}
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="p-2 border rounded-lg bg-gray-50"
-                />
-                <select
-                  disabled={!isEditing}
-                  value={formData.gender}
-                  onChange={(e) =>
-                    setFormData({ ...formData, gender: e.target.value })
-                  }
-                  className="p-2 border rounded-lg bg-gray-50"
-                >
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
-                </select>
-              </div>
-
-              <input
-                disabled={!isEditing}
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                className="w-full p-2 border rounded-lg bg-gray-50"
-              />
-
-              <textarea
-                disabled={!isEditing}
-                value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
-                className="w-full p-2 border rounded-lg bg-gray-50"
-                rows={3}
-              />
-
-              {isEditing && (
-                <button className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">
-                  Save Changes
-                </button>
-              )}
-            </form>
-
-            {/* ================= VITALS (UPDATED) ================= */}
-            <div className="mt-8 pt-6 border-t">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold">My Vitals</h3>
-                <button
-                  onClick={() => setIsAddingVital(true)}
-                  className="text-sm text-blue-600 font-bold"
-                >
-                  + Add Custom Vital
-                </button>
-              </div>
-
-              {isAddingVital && (
-                <div className="bg-blue-50 p-4 rounded-lg mb-4 flex gap-2">
-                  <input
-                    placeholder="Type (e.g. Height)"
-                    className="flex-1 p-2 rounded border"
-                    value={newVital.type}
-                    onChange={(e) =>
-                      setNewVital({ ...newVital, type: e.target.value })
-                    }
-                  />
-                  <input
-                    placeholder="Value (e.g. 6ft)"
-                    className="flex-1 p-2 rounded border"
-                    value={newVital.value}
-                    onChange={(e) =>
-                      setNewVital({ ...newVital, value: e.target.value })
-                    }
-                  />
-                  <button
-                    onClick={handleAddVital}
-                    className="bg-blue-600 text-white px-4 rounded font-bold"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setIsAddingVital(false)}
-                    className="text-gray-500 px-2"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {vitals.map((v: any) => (
-                  <div
-                    key={v.id}
-                    className="bg-gray-50 p-4 rounded-lg flex justify-between items-center group"
-                  >
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase">
-                        {v.type}
-                      </p>
-                      <p className="text-lg font-bold text-gray-900">
-                        {v.value}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteVital(v.id)}
-                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600"
-                    >
-                      ✕
+          <div className="space-y-4">
+            {user.bookings.length === 0 && <p className="text-center text-gray-400 mt-10">No appointments yet.</p>}
+            {user.bookings.map((b: any) => (
+              <div key={b.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative">
+                <div className={`absolute top-3 right-3 px-2 py-0.5 text-[10px] font-bold rounded ${b.status === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>{b.status}</div>
+                <div className="flex gap-4">
+                  <div className="bg-gray-100 w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-gray-600">
+                    <span className="text-lg">{format(new Date(b.date), "d")}</span>
+                    <span className="text-[9px] uppercase">{format(new Date(b.date), "MMM")}</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">{b.specialist.name}</h3>
+                    <p className="text-xs text-gray-500">{b.specialist.category} • {b.slotTime}</p>
+                    <button onClick={() => setSelectedBooking(b)} className="mt-2 text-xs font-bold text-blue-600 flex items-center gap-1">
+                      <Eye size={12} /> View Details
                     </button>
                   </div>
-                ))}
+                </div>
+                {/* Action Buttons */}
+                <div className="mt-4 flex gap-2">
+                   {b.locationType === 'VIDEO' && b.status === 'UPCOMING' && (
+                     <a href={`/room/${b.id}`} className="flex-1 bg-purple-600 text-white text-center py-2 rounded-lg text-sm font-bold">Join Call</a>
+                   )}
+                </div>
               </div>
-            </div>
+            ))}
           </div>
+        )}
+
+        {/* --- 2. FINANCE TAB --- */}
+        {activeTab === "FINANCE" && (
+          <div className="space-y-3">
+             {user.bookings.map((b: any) => {
+               const due = b.totalPrice - b.amountPaid;
+               return (
+               <div key={b.id} className="bg-white p-4 rounded-xl border border-gray-100 flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-sm">Dr. {b.specialist.name}</p>
+                    <p className="text-xs text-gray-400">{format(new Date(b.date), "dd MMM")}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900">₹{b.totalPrice}</p>
+                    {due <= 0 ? (
+                       <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded font-bold">PAID</span>
+                    ) : (
+                       <div className="flex flex-col items-end gap-1">
+                         <span className="text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded font-bold">DUE: ₹{due}</span>
+                         <button onClick={() => setPayModalData(b)} className="text-[10px] bg-black text-white px-2 py-1 rounded font-bold">Pay Balance</button>
+                       </div>
+                    )}
+                    {due <= 0 && (
+                       <button onClick={() => toast.success("Invoice Downloading...")} className="block mt-1 text-[10px] text-blue-600 underline">Invoice</button>
+                    )}
+                  </div>
+               </div>
+             )})}
+          </div>
+        )}
+
+        {/* --- 3. RECORDS TAB --- */}
+        {activeTab === "RECORDS" && (
+           <div className="space-y-3">
+              {user.bookings.filter((b: any) => b.prescription || b.medicalDocs).length === 0 && <p className="text-center text-gray-400 mt-10">No records found</p>}
+              
+              {user.bookings.filter((b: any) => b.prescription).map((b: any) => (
+                 <div key={b.id} className="bg-white p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                       <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><FileText size={20} /></div>
+                       <div>
+                         <p className="font-bold text-sm">Prescription</p>
+                         <p className="text-xs text-gray-500">Dr. {b.specialist.name} • {format(new Date(b.date), "d MMM")}</p>
+                       </div>
+                    </div>
+                    <button onClick={() => generatePrescriptionPDF(b, b.prescription)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><Download size={16} /></button>
+                 </div>
+              ))}
+           </div>
+        )}
+
+        {/* --- 4. PROFILE TAB --- */}
+        {activeTab === "PROFILE" && (
+           <div className="space-y-6">
+              
+              {/* VITALS SECTION */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-100">
+                 <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-gray-900 flex items-center gap-2"><Activity size={18} /> My Vitals</h3>
+                    <button onClick={handleSaveVitals} disabled={loading} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold">{loading ? "Saving..." : "Update"}</button>
+                 </div>
+                 <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Weight (kg)</label>
+                        <input value={vitalForm.weight} onChange={e => setVitalForm({...vitalForm, weight: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="e.g. 70" />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Height (cm)</label>
+                        <input value={vitalForm.height} onChange={e => setVitalForm({...vitalForm, height: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="e.g. 175" />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">BP (mmHg)</label>
+                        <input value={vitalForm.bp} onChange={e => setVitalForm({...vitalForm, bp: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="e.g. 120/80" />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Blood Group</label>
+                        <select value={vitalForm.bloodGroup} onChange={e => setVitalForm({...vitalForm, bloodGroup: e.target.value})} className="w-full p-2 border rounded-lg bg-white">
+                           <option value="">Select</option>
+                           <option>A+</option><option>B+</option><option>O+</option><option>AB+</option>
+                        </select>
+                    </div>
+                 </div>
+              </div>
+
+              {/* PERSONAL DETAILS */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-100">
+                 <h3 className="font-bold text-gray-900 mb-4">Personal Details</h3>
+                 <div className="space-y-3">
+                    <input placeholder="Phone" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} className="w-full p-3 border rounded-xl" />
+                    <div className="flex gap-3">
+                       <input placeholder="Age" value={profileData.age} onChange={e => setProfileData({...profileData, age: e.target.value})} className="flex-1 p-3 border rounded-xl" />
+                       <select value={profileData.gender} onChange={e => setProfileData({...profileData, gender: e.target.value})} className="flex-1 p-3 border rounded-xl bg-white">
+                          <option>Male</option><option>Female</option>
+                       </select>
+                    </div>
+                    <textarea placeholder="Address" value={profileData.address} onChange={e => setProfileData({...profileData, address: e.target.value})} className="w-full p-3 border rounded-xl" />
+                    <button onClick={handleUpdateProfile} disabled={loading} className="w-full bg-black text-white font-bold py-3 rounded-xl">{loading ? "Saving..." : "Save Changes"}</button>
+                 </div>
+              </div>
+
+              {/* FAMILY SECTION */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-100">
+                 <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-bold text-gray-900">Family Members</h3>
+                    <button onClick={() => setShowFamilyModal(true)} className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold">+ Add</button>
+                 </div>
+                 
+                 {(!familyMembers || familyMembers.length === 0) ? (
+                    <p className="text-xs text-gray-400 italic">No family members added.</p>
+                 ) : (
+                    <div className="space-y-2">
+                        {familyMembers.map((m: any) => (
+                        <div key={m.id} className="flex justify-between p-3 border rounded-lg bg-gray-50">
+                            <div>
+                                <span className="font-bold text-sm block">{m.name}</span>
+                                <span className="text-xs text-gray-500">{m.relation} • {m.age} Yrs</span>
+                            </div>
+                            <span className="text-xs font-bold text-gray-400">{m.gender}</span>
+                        </div>
+                        ))}
+                    </div>
+                 )}
+              </div>
+           </div>
         )}
       </div>
 
-      {/* ================= PAY MODAL ================= */}
-      {payModalOpen && selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 text-center">
-            <h3 className="text-lg font-bold mb-2">Pay Remaining Balance</h3>
-
-            <p className="text-3xl font-bold mb-6">
-              ₹{selectedBooking.totalPrice - selectedBooking.amountPaid}
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPayModalOpen(false)}
-                className="flex-1 py-3 bg-gray-100 rounded-xl font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={processBalancePayment}
-                disabled={isProcessing}
-                className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold"
-              >
-                {isProcessing ? "Verifying..." : "I Have Paid"}
-              </button>
-            </div>
-          </div>
+      {/* --- MODAL: VIEW DETAILS --- */}
+      {selectedBooking && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative">
+              <button onClick={() => setSelectedBooking(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></button>
+              
+              <h3 className="font-bold text-xl mb-1">Booking Details</h3>
+              <p className="text-xs text-gray-500 mb-6">ID: #{selectedBooking.id}</p>
+              
+              <div className="space-y-4 text-sm">
+                 <div className="flex justify-between py-2 border-b">
+                    <span className="text-gray-500">Doctor</span>
+                    <span className="font-bold">Dr. {selectedBooking.specialist.name}</span>
+                 </div>
+                 <div className="flex justify-between py-2 border-b">
+                    <span className="text-gray-500">Patient</span>
+                    <span className="font-bold">{selectedBooking.familyMember ? selectedBooking.familyMember.name : "Myself"}</span>
+                 </div>
+                 <div className="flex justify-between py-2 border-b">
+                    <span className="text-gray-500">Date & Time</span>
+                    <span className="font-bold">{format(new Date(selectedBooking.date), "d MMM")} • {selectedBooking.slotTime}</span>
+                 </div>
+                 <div className="flex justify-between py-2 border-b">
+                    <span className="text-gray-500">Fee Status</span>
+                    <span className={selectedBooking.amountPaid >= selectedBooking.totalPrice ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                        {selectedBooking.amountPaid >= selectedBooking.totalPrice ? "Paid Full" : `Due ₹${selectedBooking.totalPrice - selectedBooking.amountPaid}`}
+                    </span>
+                 </div>
+                 
+                 {selectedBooking.locationType === 'CLINIC' && selectedBooking.clinic && (
+                    <div className="bg-gray-50 p-3 rounded-xl mt-2">
+                       <p className="font-bold text-xs text-gray-500 uppercase mb-1">Clinic Address</p>
+                       <p className="font-bold">{selectedBooking.clinic.name}</p>
+                       <p className="text-xs text-gray-600">{selectedBooking.clinic.address}, {selectedBooking.clinic.city}</p>
+                       <a href={`https://maps.google.com/?q=${selectedBooking.clinic.address}`} target="_blank" className="text-blue-600 text-xs font-bold mt-2 inline-flex items-center gap-1"><MapPin size={12} /> View on Map</a>
+                    </div>
+                 )}
+                 
+                 {selectedBooking.locationType === 'HOME' && (
+                    <div className="bg-gray-50 p-3 rounded-xl mt-2">
+                       <p className="font-bold text-xs text-gray-500 uppercase mb-1">Home Visit Address</p>
+                       <p className="text-sm">{selectedBooking.visitAddress}</p>
+                    </div>
+                 )}
+              </div>
+           </div>
         </div>
       )}
+
+      {/* --- MODAL: PAY BALANCE --- */}
+      {payModalData && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative text-center">
+              <button onClick={() => setPayModalData(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></button>
+              
+              <h3 className="font-bold text-lg mb-2">Pay Remaining Balance</h3>
+              <h1 className="text-4xl font-bold text-gray-900 mb-6">₹{payModalData.totalPrice - payModalData.amountPaid}</h1>
+              
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
+                 <p className="text-xs font-bold text-blue-600 uppercase mb-2">Scan QR</p>
+                 <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=care@revivehub.co.in&pn=ReviveHub&am=${payModalData.totalPrice - payModalData.amountPaid}&cu=INR`} alt="QR" className="mx-auto w-32 h-32" />
+              </div>
+
+              <input 
+                 value={utrInput}
+                 onChange={(e) => setUtrInput(e.target.value)}
+                 placeholder="Enter UTR / Ref No."
+                 className="w-full p-3 border rounded-xl text-center font-mono tracking-widest mb-3"
+              />
+              
+              <button onClick={handlePayBalance} disabled={loading} className="w-full bg-green-600 text-white font-bold py-3 rounded-xl">
+                 {loading ? <Loader2 className="animate-spin mx-auto" /> : "Verify Payment"}
+              </button>
+           </div>
+        </div>
+      )}
+      
+      {/* --- MODAL: ADD FAMILY --- */}
+      {showFamilyModal && (
+         <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6">
+               <h3 className="font-bold text-lg mb-4">Add Member</h3>
+               <input placeholder="Name" className="w-full p-3 border rounded-xl mb-3" onChange={e => setNewMember({...newMember, name: e.target.value})} />
+               <input placeholder="Relation (e.g. Wife)" className="w-full p-3 border rounded-xl mb-3" onChange={e => setNewMember({...newMember, relation: e.target.value})} />
+               <div className="flex gap-2 mb-3">
+                  <input placeholder="Age" className="flex-1 p-3 border rounded-xl" onChange={e => setNewMember({...newMember, age: e.target.value})} />
+                  <select className="flex-1 p-3 border rounded-xl bg-white" onChange={e => setNewMember({...newMember, gender: e.target.value})}><option>Male</option><option>Female</option></select>
+               </div>
+               <button onClick={handleAddFamily} disabled={loading} className="w-full bg-black text-white font-bold py-3 rounded-xl">{loading ? "Saving..." : "Add Member"}</button>
+               <button onClick={() => setShowFamilyModal(false)} className="w-full text-center py-3 text-gray-500 mt-2">Cancel</button>
+            </div>
+         </div>
+      )}
+
     </div>
   );
 }

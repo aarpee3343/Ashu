@@ -71,11 +71,11 @@ export default function Navbar() {
       internal: true 
     },
     {
-      href: "#",
+      href: "/video-consultation",
       label: "Video Consult",
       icon: <Video size={20} />,
       onClick: () => alert("Video Consult coming soon!"),
-      internal: false
+      internal: true
     },
     {
       href: "https://waytolab.com/",

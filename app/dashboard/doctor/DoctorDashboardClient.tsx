@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link"; // Import Link
 
 // CONSTANT: Time Slots
 const ALL_TIMES = [
@@ -40,23 +41,25 @@ export default function DoctorDashboardClient({ specialist }: any) {
   const [showClinicModal, setShowClinicModal] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
 
-  // Forms & Inputs
+  // Forms
   const [otpInput, setOtpInput] = useState("");
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [cashCollectedCheck, setCashCollectedCheck] = useState(false);
   const [clinicForm, setClinicForm] = useState({ name: "", address: "", city: "", state: "", pincode: "" });
   const [bankForm, setBankForm] = useState(specialist.bankAccount || { accountHolder: "", accountNumber: "", bankName: "", ifscCode: "" });
   
-  // Profile Form
+  // Profile Form (Added Video Fields)
   const [profileForm, setProfileForm] = useState({
     bio: specialist.bio,
     experience: specialist.experience,
     price: specialist.price,
     qualifications: specialist.qualifications,
-    hospitals: specialist.hospitals
+    hospitals: specialist.hospitals,
+    isVideoAvailable: specialist.isVideoAvailable, // NEW
+    videoConsultationFee: specialist.videoConsultationFee // NEW
   });
 
-  // Financials
+  // Financials Calculation
   const totalRevenue = specialist.bookings.reduce((sum: number, b: any) => sum + b.totalPrice, 0);
   const cashCollected = specialist.bookings.filter((b: any) => b.paymentType === "PAY_ON_SERVICE").reduce((sum: number, b: any) => sum + (b.amountPaid || 0), 0);
   const onlineCollected = specialist.bookings.filter((b: any) => b.paymentType === "ONLINE_ADVANCE").reduce((sum: number, b: any) => sum + b.amountPaid, 0);
@@ -65,7 +68,6 @@ export default function DoctorDashboardClient({ specialist }: any) {
 
   // --- ACTIONS ---
 
-  // Profile Update
   const handleUpdateProfile = async () => {
     try {
       const res = await fetch("/api/doctor/profile", {
@@ -88,10 +90,8 @@ export default function DoctorDashboardClient({ specialist }: any) {
 
   const handleBulkSlotAction = async (action: "BLOCK" | "OPEN") => {
     if(selectedSlotsForAction.length === 0) return toast.error("Select slots first");
-
     const dateStr = format(selectedSlotDate, "yyyy-MM-dd");
     const toastId = toast.loading("Updating...");
-
     try {
       await Promise.all(selectedSlotsForAction.map(time => 
          fetch("/api/doctor/slots", {
@@ -99,38 +99,26 @@ export default function DoctorDashboardClient({ specialist }: any) {
             body: JSON.stringify({ date: dateStr, time, action }),
          })
       ));
-      
       toast.success("Updated Successfully", { id: toastId });
       setSelectedSlotsForAction([]);
       router.refresh();
-    } catch {
-      toast.error("Failed", { id: toastId });
-    }
+    } catch { toast.error("Failed", { id: toastId }); }
   };
 
   const handleBlockEntireDate = async () => {
-    const hasBookings = specialist.bookings.some((b: any) => isSameDay(new Date(b.date), selectedSlotDate) && b.status !== 'CANCELLED');
-    
-    if (hasBookings) {
-       if (!confirm(`Warning: You have active bookings on ${format(selectedSlotDate, "dd MMM")}. Making this date unavailable will require you to cancel them manually. Proceed?`)) return;
-    } else {
-       if (!confirm(`Block ALL slots for ${format(selectedSlotDate, "dd MMM")}?`)) return;
-    }
-    
+    if (!confirm(`Block ALL slots for ${format(selectedSlotDate, "dd MMM")}?`)) return;
     const dateStr = format(selectedSlotDate, "yyyy-MM-dd");
     try {
       await Promise.all(ALL_TIMES.map(time => 
-         fetch("/api/doctor/slots", {
-            method: "POST",
-            body: JSON.stringify({ date: dateStr, time, action: "BLOCK" }),
-         })
+         fetch("/api/doctor/slots", { method: "POST", body: JSON.stringify({ date: dateStr, time, action: "BLOCK" }) })
       ));
       toast.success("Date blocked successfully");
-      window.location.reload();
+      router.refresh(); // Better than reload
     } catch { toast.error("Failed"); }
   };
 
   const verifyOtpAndComplete = async () => {
+    // For Clinic visits, we enforce OTP. For Video, we can skip if needed, but keeping it standard is safer.
     if (otpInput !== generatedOtp) return toast.error("Invalid OTP");
     
     let amount = 0;
@@ -151,7 +139,6 @@ export default function DoctorDashboardClient({ specialist }: any) {
     } catch { toast.error("Error"); }
   };
 
-  // Generic Handlers
   const handleAddClinic = async () => {
     await fetch("/api/doctor/clinics", { method: "POST", body: JSON.stringify(clinicForm) });
     toast.success("Clinic Added");
@@ -186,13 +173,14 @@ export default function DoctorDashboardClient({ specialist }: any) {
            <div>
              <h1 className="text-2xl font-bold">Dr. {specialist.name}</h1>
              <p className="text-gray-500">{specialist.category}</p>
+             {specialist.isVideoAvailable && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-bold mt-1 inline-block">📹 Video Enabled</span>}
            </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
+        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
            {["APPOINTMENTS", "CLINICS", "SLOTS", "FINANCIALS", "PROFILE"].map(tab => (
-             <button key={tab} onClick={() => changeTab(tab)} className={`px-6 py-2 rounded-full font-bold text-sm ${activeTab === tab ? "bg-black text-white" : "bg-white text-gray-600"}`}>
+             <button key={tab} onClick={() => changeTab(tab)} className={`px-6 py-2 rounded-full font-bold text-sm whitespace-nowrap ${activeTab === tab ? "bg-black text-white" : "bg-white text-gray-600"}`}>
                {tab}
              </button>
            ))}
@@ -207,16 +195,34 @@ export default function DoctorDashboardClient({ specialist }: any) {
             {specialist.bookings.map((b: any) => (
               <div key={b.id} className="bg-white p-6 rounded-xl border flex flex-col md:flex-row justify-between gap-4">
                 <div>
-                  <p className="font-bold text-lg">{b.user.name}</p>
-                  <p className="text-sm text-gray-500">{format(new Date(b.date), "dd MMM")} • {b.slotTime} ({b.duration} Days)</p>
+                  <div className="flex items-center gap-2">
+                     <p className="font-bold text-lg">{b.user.name}</p>
+                     {b.locationType === 'VIDEO' && <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded font-bold">VIDEO CALL</span>}
+                  </div>
+                  <p className="text-sm text-gray-500">{format(new Date(b.date), "dd MMM")} • {b.slotTime}</p>
                   <p className={`text-xs font-bold mt-1 ${b.paymentType === 'ONLINE_ADVANCE' ? 'text-blue-600' : 'text-orange-600'}`}>
                     {b.paymentType === "ONLINE_ADVANCE" ? "Paid Online" : "Pay at Clinic"} (₹{b.totalPrice})
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                    <button onClick={() => { setSelectedBooking(b); setDetailsModalOpen(true); }} className="px-4 py-2 border rounded-lg text-sm font-bold">Details</button>
+                   
+                   {/* NEW: JOIN VIDEO BUTTON */}
+                   {b.locationType === 'VIDEO' && b.status === 'UPCOMING' && (
+                      <Link 
+                        href={`/room/${b.id}`} 
+                        target="_blank"
+                        className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"
+                      >
+                         📹 Join Call
+                      </Link>
+                   )}
+
+                   {/* COMPLETE BUTTON */}
                    {b.status === "UPCOMING" && (
-                     <button onClick={() => { setGeneratedOtp(Math.floor(1000 + Math.random() * 9000).toString()); setSelectedBooking(b); setOtpModalOpen(true); }} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">Complete</button>
+                     <button onClick={() => { setGeneratedOtp(Math.floor(1000 + Math.random() * 9000).toString()); setSelectedBooking(b); setOtpModalOpen(true); }} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
+                        {b.locationType === 'VIDEO' ? 'End & Complete' : 'Verify & Complete'}
+                     </button>
                    )}
                    {b.status === "COMPLETED" && <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-lg text-sm">Completed</span>}
                 </div>
@@ -225,7 +231,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* 2. CLINICS */}
+        {/* 2. CLINICS (Unchanged) */}
         {activeTab === "CLINICS" && (
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="space-y-4">
@@ -237,7 +243,8 @@ export default function DoctorDashboardClient({ specialist }: any) {
               ))}
               <button onClick={() => setShowClinicModal(true)} className="w-full py-4 border-2 border-dashed font-bold text-gray-500">+ Add New Clinic</button>
             </div>
-            {showClinicModal && (
+            {/* Modal Logic Same as before */}
+             {showClinicModal && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                 <div className="bg-white p-6 rounded-xl w-96">
                    <h3 className="font-bold mb-4">Add Clinic</h3>
@@ -256,7 +263,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* 3. SLOTS */}
+        {/* 3. SLOTS (Unchanged) */}
         {activeTab === "SLOTS" && (
           <div className="grid lg:grid-cols-3 gap-8">
              <div className="bg-white p-6 rounded-xl border h-fit">
@@ -277,7 +284,6 @@ export default function DoctorDashboardClient({ specialist }: any) {
                    })}
                 </div>
              </div>
-
              <div className="lg:col-span-2 bg-white p-6 rounded-xl border">
                 <div className="flex justify-between mb-6">
                    <h3 className="font-bold">Manage {format(selectedSlotDate, "dd MMM")}</h3>
@@ -312,7 +318,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* 4. FINANCIALS */}
+        {/* 4. FINANCIALS (Unchanged - Logic already handles video fees in totalPrice) */}
         {activeTab === "FINANCIALS" && (
           <div className="space-y-6">
              <div className="grid grid-cols-4 gap-4">
@@ -321,7 +327,8 @@ export default function DoctorDashboardClient({ specialist }: any) {
                 <div className="bg-white p-4 border rounded-xl"><p className="text-xs text-gray-500">Online</p><p className="font-bold text-xl text-blue-600">₹{onlineCollected}</p></div>
                 <div className="bg-white p-4 border rounded-xl"><p className="text-xs text-gray-500">Payout</p><p className="font-bold text-xl text-green-600">₹{payoutEligibleAmount}</p></div>
              </div>
-             <div className="bg-white p-6 border rounded-xl flex justify-between">
+             {/* ... Bank Details & Payout button (Same as before) ... */}
+              <div className="bg-white p-6 border rounded-xl flex justify-between">
                 <p>Bank: {specialist.bankAccount ? specialist.bankAccount.accountNumber : "Not Added"}</p>
                 <button onClick={() => setShowBankModal(true)} className="text-blue-600 font-bold text-sm">Edit</button>
              </div>
@@ -348,7 +355,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* 5. PROFILE TAB */}
+        {/* 5. PROFILE TAB (UPDATED WITH VIDEO OPTIONS) */}
         {activeTab === "PROFILE" && (
            <div className="bg-white p-8 rounded-xl border max-w-2xl">
               <h3 className="font-bold text-xl mb-6">Edit Profile</h3>
@@ -359,7 +366,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
                  </div>
                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                       <label className="block text-sm font-bold text-gray-600 mb-1">Price (₹)</label>
+                       <label className="block text-sm font-bold text-gray-600 mb-1">Clinic Fee (₹)</label>
                        <input type="number" className="w-full p-2 border rounded" value={profileForm.price} onChange={e => setProfileForm({...profileForm, price: Number(e.target.value)})} />
                     </div>
                     <div>
@@ -367,6 +374,31 @@ export default function DoctorDashboardClient({ specialist }: any) {
                        <input type="number" className="w-full p-2 border rounded" value={profileForm.experience} onChange={e => setProfileForm({...profileForm, experience: Number(e.target.value)})} />
                     </div>
                  </div>
+                 
+                 {/* VIDEO SETTINGS */}
+                 <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <label className="flex items-center gap-3 font-bold text-purple-900 mb-3 cursor-pointer">
+                       <input 
+                         type="checkbox" 
+                         className="accent-purple-600 w-5 h-5" 
+                         checked={profileForm.isVideoAvailable} 
+                         onChange={e => setProfileForm({...profileForm, isVideoAvailable: e.target.checked})} 
+                       />
+                       Enable Video Consultations
+                    </label>
+                    {profileForm.isVideoAvailable && (
+                       <div>
+                          <label className="block text-xs font-bold text-purple-800 mb-1">Video Fee (₹ / 15 mins)</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-2 border border-purple-200 rounded" 
+                            value={profileForm.videoConsultationFee || ""} 
+                            onChange={e => setProfileForm({...profileForm, videoConsultationFee: Number(e.target.value)})} 
+                          />
+                       </div>
+                    )}
+                 </div>
+
                  <div>
                     <label className="block text-sm font-bold text-gray-600 mb-1">Qualifications</label>
                     <input className="w-full p-2 border rounded" value={profileForm.qualifications} onChange={e => setProfileForm({...profileForm, qualifications: e.target.value})} />
@@ -379,17 +411,25 @@ export default function DoctorDashboardClient({ specialist }: any) {
               </div>
            </div>
         )}
-
       </div>
 
-      {/* --- MODALS --- */}
-      {/* 1. OTP Modal */}
+      {/* --- MODALS (Same as before) --- */}
       {otpModalOpen && selectedBooking && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
            <div className="bg-white p-8 rounded-2xl w-full max-w-sm shadow-2xl">
-              <h3 className="font-bold text-xl mb-4 text-center">Verify Patient</h3>
+              <h3 className="font-bold text-xl mb-4 text-center">
+                 {selectedBooking.locationType === 'VIDEO' ? 'End Video Session' : 'Verify Patient'}
+              </h3>
+              
+              <p className="text-center text-gray-500 mb-4 text-sm">
+                 {selectedBooking.locationType === 'VIDEO' 
+                    ? 'Enter the code displayed to the patient to mark this as complete.'
+                    : 'Ask patient for the code to verify presence.'}
+              </p>
+
               <p className="text-center text-4xl font-mono font-bold text-blue-600 mb-4 tracking-widest">{generatedOtp}</p>
               <input value={otpInput} onChange={(e) => setOtpInput(e.target.value)} maxLength={4} className="w-full text-center text-3xl font-bold border-b-2 mb-6 py-2 outline-none" placeholder="0000" />
+              
               {selectedBooking.paymentType === "PAY_ON_SERVICE" && (
                  <div className="bg-yellow-50 p-4 rounded-xl mb-6 border border-yellow-100">
                     <label className="flex items-center gap-3 font-bold text-sm">
@@ -405,7 +445,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
         </div>
       )}
 
-      {/* 2. Details Modal */}
+      {/* Details Modal (Unchanged) */}
       {detailsModalOpen && selectedBooking && (
          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl w-full max-w-2xl h-[80vh] overflow-y-auto relative p-8">

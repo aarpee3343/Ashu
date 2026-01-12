@@ -10,7 +10,6 @@ export const dynamic = "force-dynamic";
 export default async function UserDashboard() {
   const session = await getServerSession(authOptions);
 
-  // FIX: Check session AND session.user explicitly
   if (!session || !session.user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -24,13 +23,20 @@ export default async function UserDashboard() {
 
   // Fetch full user data
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email! }, // The ! assumes email exists, which is safe after auth check
+    where: { email: session.user.email! },
     include: {
       bookings: {
-        include: { specialist: true },
+        // ✅ ADDED: 'clinic' and 'familyMember' so details show up correctly
+        include: { 
+            specialist: true, 
+            clinic: true,
+            familyMember: true 
+        },
         orderBy: { date: "desc" },
       },
-      vitals: true, // Include vitals for the dashboard
+      vitals: true,
+      // ✅ CRITICAL FIX: Include this so the list appears!
+      familyMembers: true, 
     },
   });
 

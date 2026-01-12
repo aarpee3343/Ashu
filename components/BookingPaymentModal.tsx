@@ -1,29 +1,71 @@
 "use client";
 
 import { useSession, signIn } from "next-auth/react";
-import { useState } from "react";
-import { format } from "date-fns";
+import { useState, useEffect } from "react";
+import { format, addHours, isBefore, parse } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { MapPin, Home, Video, Building2, Clock } from "lucide-react";
 
 export default function BookingPaymentModal({ 
-  isOpen, onClose, specialist, date, slot, duration, locationType, address, totalPrice 
+  isOpen, onClose, specialist, date, slot, initialMode = "CLINIC" 
 }: any) {
   const { data: session } = useSession();
   const router = useRouter();
   
-  // Steps: 1 = Details, 2 = Payment
-  const [step, setStep] = useState(1); 
+  // State
+  const [locationType, setLocationType] = useState(initialMode);
   
-  // New State for Step 1
-  const [medicalCondition, setMedicalCondition] = useState("");
-  const [medicalDocs, setMedicalDocs] = useState(""); // Stores mock URL
-  const [selectedClinicId, setSelectedClinicId] = useState("");
+  // "duration" means:
+  // - For Video: Total Minutes (15, 30, 45, 60)
+  // - For Home: Number of 1-Hour Sessions (1, 2, 3...)
+  // - For Clinic: Always 1
+  const [duration, setDuration] = useState(1); 
+  
+  // --- PRICE & LABEL CALCULATION ---
+  let finalPrice = 0;
+  let durationDisplay = "";
+  let rateDisplay = "";
 
-  // Payment State
+  if (locationType === "VIDEO") {
+     const baseVideoFee = specialist.videoConsultationFee || specialist.price;
+     // If duration is in minutes (15, 30...), calculate blocks
+     const blocks = duration / 15; 
+     finalPrice = baseVideoFee * blocks;
+     durationDisplay = `${duration} Mins`;
+     rateDisplay = `₹${baseVideoFee} / 15 mins`;
+  } 
+  else if (locationType === "HOME") {
+     // Home Visit: Base Price * Number of Sessions
+     finalPrice = specialist.price * duration;
+     durationDisplay = `${duration} Session${duration > 1 ? 's' : ''} (${duration} Hr)`;
+     rateDisplay = `₹${specialist.price} / 1 hour`;
+  } 
+  else {
+     // Clinic: Fixed Price
+     finalPrice = specialist.price;
+     durationDisplay = "Standard Visit";
+     rateDisplay = `₹${specialist.price} flat fee`;
+  }
+
+  // Other State
+  const [step, setStep] = useState(1); 
+  const [medicalCondition, setMedicalCondition] = useState("");
+  const [medicalDocs, setMedicalDocs] = useState(""); 
+  const [selectedClinicId, setSelectedClinicId] = useState("");
+  const [homeAddress, setHomeAddress] = useState(""); 
   const [paymentMode, setPaymentMode] = useState<"SERVICE" | "ONLINE">("SERVICE");
   const [advancePercent, setAdvancePercent] = useState(100);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Sync state when modal opens
+  useEffect(() => {
+    if(isOpen) {
+        setLocationType(initialMode);
+        // Default values based on mode
+        setDuration(initialMode === "VIDEO" ? 15 : 1);
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
@@ -42,80 +84,51 @@ export default function BookingPaymentModal({
     );
   }
 
-  // --- 2. ROLE CHECK (Prevent Doctors/Admins from booking) ---
-  const userRole = (session.user as any)?.role;
-  if (userRole === "SPECIALIST" || userRole === "ADMIN") {
-    return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-fade-in">
-          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">⛔</div>
-          <h3 className="text-xl font-bold mb-2">Action Not Allowed</h3>
-          <p className="text-gray-500 mb-6">
-            You are logged in as a <strong>{userRole === 'SPECIALIST' ? 'Doctor' : 'Admin'}</strong>.
-            <br />
-            To book an appointment, please log in with a <strong>Patient</strong> account.
-          </p>
-          <button onClick={onClose} className="w-full bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-black">Okay, Close</button>
-        </div>
-      </div>
-    );
-  }
-
-  const payNowAmount = paymentMode === "SERVICE" ? 0 : (totalPrice * advancePercent) / 100;
-  
-  // Dummy QR Logic
+  // --- 2. PAYMENT & QR ---
+  const payNowAmount = paymentMode === "SERVICE" ? 0 : Math.round((finalPrice * advancePercent) / 100);
   const qrApiBase = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=";
   const qrData = `upi://pay?pa=healthplatform@upi&pn=Health&am=${payNowAmount}&cu=INR`;
 
-  // Dummy File Upload
+  // --- 3. FILE UPLOAD ---
   const handleFileUpload = async (e: any) => {
     const file = e.target.files[0];
-    if (file) {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const promise = fetch("/api/upload", { method: "POST", body: formData })
-        .then(res => res.json())
-        .then(data => {
-           if(data.success) {
-             setMedicalDocs(data.url); // Saves /api/files/xyz.enc
-             return "File uploaded!";
-           } else {
-             throw new Error("Upload failed");
-           }
-        });
-
-      toast.promise(promise, {
-        loading: 'Encrypting & Uploading...',
-        success: 'Securely Uploaded!',
-        error: 'Upload failed',
-      });
-    }
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const promise = fetch("/api/upload", { method: "POST", body: formData }).then(res => res.json());
+    toast.promise(promise, {
+       loading: 'Uploading...',
+       success: (data) => {
+          if(data.success) { setMedicalDocs(data.url); return "Attached!"; }
+          else throw new Error("Failed");
+       },
+       error: 'Upload failed'
+    });
   };
 
+  // --- 4. CONFIRM BOOKING ---
   const handleConfirmBooking = async () => {
-    // FIX: Explicit safety check for session and user
-    if (!session || !session.user) {
-        toast.error("You must be logged in.");
-        return;
-    }
+    if (!session || !session.user) return toast.error("You must be logged in.");
+    if (locationType === "HOME" && !homeAddress) return toast.error("Enter home address");
+    if (locationType === "CLINIC" && !selectedClinicId) return toast.error("Select a clinic");
 
     setIsProcessing(true);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
         body: JSON.stringify({
-          userId: (session.user as any).id, // FIX: Cast to 'any' to avoid TS error
+          userId: (session.user as any).id,
           specialistId: specialist.id,
           date: date,
           slotTime: slot,
-          totalPrice: totalPrice,
+          totalPrice: finalPrice,
           amountPaid: payNowAmount,
           paymentType: paymentMode === "SERVICE" ? "PAY_ON_SERVICE" : "ONLINE_ADVANCE",
-          duration: duration,
+          // Send duration logic
+          duration: duration, 
           locationType: locationType,
-          visitAddress: address,
-          clinicId: selectedClinicId || null,
+          visitAddress: locationType === 'HOME' ? homeAddress : null,
+          clinicId: locationType === 'CLINIC' ? selectedClinicId : null,
           medicalCondition: medicalCondition,
           medicalDocs: medicalDocs
         }),
@@ -135,69 +148,155 @@ export default function BookingPaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4">
+      <div className="bg-white w-full sm:rounded-2xl sm:max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh] rounded-t-2xl animate-slide-up">
         
-        <div className="bg-gray-50 p-4 border-b flex justify-between items-center">
+        <div className="bg-gray-50 p-4 border-b flex justify-between items-center sticky top-0 z-10">
           <h3 className="font-bold text-lg">
-            {step === 1 ? "Patient Details" : "Review & Pay"}
+            {step === 1 ? "Booking Details" : "Review & Pay"}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button onClick={onClose} className="p-1 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors">✕</button>
         </div>
 
         <div className="p-6 overflow-y-auto custom-scrollbar">
           
           {/* Summary Card */}
-          <div className="bg-blue-50 p-4 rounded-xl mb-6 space-y-2">
-            <div className="flex justify-between font-bold text-gray-900">
-              <span>{specialist.name}</span>
-              <span>₹{totalPrice}</span>
+          <div className="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-100 shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+               <div>
+                  <div className="font-bold text-gray-900">{specialist.name}</div>
+                  <div className="flex items-center gap-1 text-xs text-blue-700 font-semibold mt-1">
+                    <Clock size={12} /> {durationDisplay}
+                  </div>
+               </div>
+               <div className="text-right">
+                  <div className="text-lg font-bold text-blue-800">₹{finalPrice}</div>
+                  <div className="text-[10px] text-blue-600">{rateDisplay}</div>
+               </div>
             </div>
-            <p className="text-sm text-gray-600">
-              {locationType === "HOME" ? "🏠 Home Visit" : "🏥 Clinic Visit"} • {duration} Days
-            </p>
-            <p className="text-sm text-gray-600">
-              Starts: <span className="font-semibold">{format(date, "d MMM, h:mm a")}</span>
-            </p>
+            <div className="flex justify-between items-center pt-3 border-t border-blue-200">
+               <span className="text-xs text-gray-500 font-medium">Slot</span>
+               <span className="text-xs font-bold text-gray-800">{format(new Date(date), "d MMM")} • {slot}</span>
+            </div>
           </div>
 
-          {/* STEP 1: MEDICAL INFO & CLINIC */}
+          {/* STEP 1: DETAILS */}
           {step === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-6">
+               
+               {/* --- LOCATION TOGGLE --- */}
+               {initialMode !== "VIDEO" ? (
+                 <div className="grid grid-cols-3 bg-gray-100 p-1 rounded-xl">
+                     <button 
+                       onClick={() => { setLocationType("CLINIC"); setDuration(1); }}
+                       className={`py-2 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${locationType === "CLINIC" ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+                     >
+                       <Building2 size={16} /> Clinic
+                     </button>
+                     <button 
+                       onClick={() => { setLocationType("HOME"); setDuration(1); }}
+                       className={`py-2 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${locationType === "HOME" ? "bg-white shadow text-green-600" : "text-gray-500 hover:text-gray-700"}`}
+                     >
+                       <Home size={16} /> Home
+                     </button>
+                     {specialist.isVideoAvailable && (
+                       <button 
+                         onClick={() => { setLocationType("VIDEO"); setDuration(15); }}
+                         className={`py-2 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${locationType === "VIDEO" ? "bg-white shadow text-purple-600" : "text-gray-500 hover:text-gray-700"}`}
+                       >
+                         <Video size={16} /> Video
+                       </button>
+                     )}
+                 </div>
+               ) : (
+                 <div className="p-3 bg-purple-50 text-purple-700 text-center font-bold rounded-xl border border-purple-100 flex items-center justify-center gap-2">
+                    <Video size={18} /> Video Consultation Selected
+                 </div>
+               )}
+
+               {/* --- DURATION CONTROLS --- */}
+               
+               {/* 1. VIDEO: Mins Selector */}
+               {locationType === "VIDEO" && (
+                  <div className="animate-fade-in">
+                    <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">Select Duration</label>
+                    <div className="grid grid-cols-4 gap-2">
+                       {[15, 30, 45, 60].map((mins) => (
+                          <button key={mins} onClick={() => setDuration(mins)} className={`py-2 rounded-lg text-sm font-bold border transition-all ${duration === mins ? "bg-purple-600 text-white border-purple-600 shadow-md" : "bg-white text-gray-600 hover:border-purple-300"}`}>{mins}m</button>
+                       ))}
+                    </div>
+                  </div>
+               )}
+
+               {/* 2. HOME: Session Counter */}
+               {locationType === "HOME" && (
+                  <div className="animate-fade-in bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <label className="block text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Number of 1-Hour Sessions</label>
+                    <div className="flex items-center justify-between">
+                       <button onClick={() => setDuration(Math.max(1, duration - 1))} className="w-10 h-10 rounded-full bg-white border border-gray-200 font-bold hover:bg-gray-100 text-lg shadow-sm">-</button>
+                       <div className="text-center">
+                          <span className="block font-bold text-2xl text-gray-900">{duration}</span>
+                          <span className="text-xs text-gray-500">Session{duration > 1 ? 's' : ''}</span>
+                       </div>
+                       <button onClick={() => setDuration(duration + 1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 font-bold hover:bg-gray-100 text-lg shadow-sm">+</button>
+                    </div>
+                  </div>
+               )}
+
+               {/* --- ADDRESS & CLINIC FIELDS --- */}
+               
                {locationType === "CLINIC" && (
-                 <div>
-                   <label className="block text-sm font-bold mb-1 text-gray-700">Select Clinic</label>
-                   <select 
-                     className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-white"
-                     onChange={(e) => setSelectedClinicId(e.target.value)}
-                     value={selectedClinicId}
-                   >
-                     <option value="">-- Choose a Clinic --</option>
-                     {specialist.clinics?.map((c: any) => (
-                       <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
-                     ))}
-                   </select>
-                   {specialist.clinics?.length === 0 && <p className="text-xs text-red-500 mt-1">Doctor has no clinics listed.</p>}
+                 <div className="animate-fade-in">
+                   <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Select Clinic Location</label>
+                   <div className="relative">
+                     <Building2 className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                     <select 
+                       className="w-full pl-10 p-3 border border-gray-300 rounded-xl outline-none bg-white focus:ring-2 focus:ring-blue-100 appearance-none"
+                       onChange={(e) => setSelectedClinicId(e.target.value)}
+                       value={selectedClinicId}
+                     >
+                       <option value="">-- Choose a Clinic --</option>
+                       {specialist.clinics?.map((c: any) => (
+                         <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
+                       ))}
+                     </select>
+                   </div>
+                 </div>
+               )}
+
+               {locationType === "HOME" && (
+                 <div className="animate-fade-in">
+                   <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Home Address</label>
+                   <div className="relative">
+                     <MapPin className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                     <textarea 
+                       className="w-full pl-10 p-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-green-100 min-h-[80px]"
+                       rows={2}
+                       placeholder="Enter full address, landmark & pincode..."
+                       value={homeAddress}
+                       onChange={(e) => setHomeAddress(e.target.value)}
+                     />
+                   </div>
                  </div>
                )}
 
                <div>
-                 <label className="block text-sm font-bold mb-1 text-gray-700">Medical Condition / Symptoms</label>
+                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Reason for Visit</label>
                  <textarea 
-                   className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500" 
-                   rows={3}
-                   placeholder="Briefly describe your issue..."
+                   className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-gray-200" 
+                   rows={2}
+                   placeholder="Describe symptoms briefly..."
                    value={medicalCondition}
                    onChange={(e) => setMedicalCondition(e.target.value)}
                  />
                </div>
 
                <div>
-                 <label className="block text-sm font-bold mb-1 text-gray-700">Upload Reports (Optional)</label>
-                 <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
+                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Upload Reports (Optional)</label>
+                 <div className="border border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 transition cursor-pointer relative bg-white">
                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileUpload} />
                     <p className="text-sm text-blue-600 font-bold">Click to Upload</p>
-                    <p className="text-xs text-gray-400 mt-1">{medicalDocs ? "File Selected" : "PDF or Images"}</p>
+                    <p className="text-xs text-gray-400 mt-1">{medicalDocs ? "File Attached ✅" : "PDF or Images"}</p>
                  </div>
                </div>
             </div>
@@ -206,70 +305,60 @@ export default function BookingPaymentModal({
           {/* STEP 2: PAYMENT */}
           {step === 2 && (
             <div className="space-y-4">
-              <label className="block font-semibold mb-2">Payment Option</label>
+              <label className="block font-bold mb-2">Payment Mode</label>
               
-              <div 
-                onClick={() => setPaymentMode("SERVICE")}
-                className={`p-4 border-2 rounded-xl cursor-pointer flex items-center gap-3 transition-all ${paymentMode === "SERVICE" ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMode === "SERVICE" ? "border-blue-600" : "border-gray-400"}`}>
+              <div onClick={() => setPaymentMode("SERVICE")} className={`p-4 border-2 rounded-xl cursor-pointer flex items-center gap-3 transition-all ${paymentMode === "SERVICE" ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMode === "SERVICE" ? "border-blue-600" : "border-gray-300"}`}>
                   {paymentMode === "SERVICE" && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
                 </div>
                 <div>
-                  <p className="font-bold">Pay Later</p>
+                  <p className="font-bold text-sm">Pay Later</p>
                   <p className="text-xs text-gray-500">Pay full amount after service.</p>
                 </div>
               </div>
 
-              <div 
-                onClick={() => setPaymentMode("ONLINE")}
-                className={`p-4 border-2 rounded-xl cursor-pointer flex items-center gap-3 transition-all ${paymentMode === "ONLINE" ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMode === "ONLINE" ? "border-blue-600" : "border-gray-400"}`}>
+              <div onClick={() => setPaymentMode("ONLINE")} className={`p-4 border-2 rounded-xl cursor-pointer flex items-center gap-3 transition-all ${paymentMode === "ONLINE" ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMode === "ONLINE" ? "border-blue-600" : "border-gray-300"}`}>
                   {paymentMode === "ONLINE" && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
                 </div>
                 <div>
-                  <p className="font-bold">Pay Advance</p>
-                  <p className="text-xs text-gray-500">Secure your booking online.</p>
+                  <p className="font-bold text-sm">Pay Advance</p>
+                  <p className="text-xs text-gray-500">Secure your booking now.</p>
                 </div>
               </div>
 
               {paymentMode === "ONLINE" && (
                 <div className="ml-8 grid grid-cols-3 gap-2">
                   {[25, 50, 100].map((pct) => (
-                    <button
-                      key={pct}
-                      onClick={() => setAdvancePercent(pct)}
-                      className={`py-2 text-xs font-bold rounded border transition-colors ${advancePercent === pct ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-                    >
-                      {pct}% (₹{(totalPrice * pct) / 100})
+                    <button key={pct} onClick={() => setAdvancePercent(pct)} className={`py-2 text-xs font-bold rounded border ${advancePercent === pct ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600"}`}>
+                      {pct}% (₹{Math.round((finalPrice * pct) / 100)})
                     </button>
                   ))}
                 </div>
               )}
 
               {paymentMode === "ONLINE" && (
-                <div className="text-center mt-4">
-                  <p className="mb-4 text-gray-700">Scan to pay <strong className="text-xl">₹{payNowAmount}</strong></p>
-                  <img src={`${qrApiBase}${encodeURIComponent(qrData)}`} alt="QR" className="mx-auto border p-2 rounded-xl" width={180} />
+                <div className="text-center mt-4 bg-gray-50 p-4 rounded-xl border">
+                  <p className="mb-2 text-gray-700 text-sm">Scan to pay <strong className="text-lg text-black">₹{payNowAmount}</strong></p>
+                  <img src={`${qrApiBase}${encodeURIComponent(qrData)}`} alt="QR" className="mx-auto border p-2 rounded-lg bg-white" width={160} />
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t bg-gray-50 flex gap-3">
+        <div className="p-4 border-t bg-gray-50 flex gap-3 sticky bottom-0 z-10 bg-white">
           {step === 2 ? (
-             <button onClick={() => setStep(1)} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300">Back</button>
+             <button onClick={() => setStep(1)} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Back</button>
           ) : (
-             <button onClick={onClose} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300">Cancel</button>
+             <button onClick={onClose} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Cancel</button>
           )}
 
           {step === 1 ? (
              <button 
                onClick={() => setStep(2)} 
-               disabled={locationType === 'CLINIC' && !selectedClinicId}
-               className="flex-[2] bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
+               disabled={(locationType === 'CLINIC' && !selectedClinicId) || (locationType === 'HOME' && !homeAddress)}
+               className="flex-[2] bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200 transition-all"
              >
                Proceed to Payment
              </button>
@@ -277,9 +366,9 @@ export default function BookingPaymentModal({
             <button 
               onClick={handleConfirmBooking} 
               disabled={isProcessing}
-              className="flex-[2] bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 shadow-lg shadow-green-200 disabled:opacity-70"
+              className="flex-[2] bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 shadow-lg shadow-green-200 disabled:opacity-70 transition-all"
             >
-              {isProcessing ? "Processing..." : "Confirm Booking"}
+              {isProcessing ? "Processing..." : `Confirm (₹${finalPrice})`}
             </button>
           )}
         </div>

@@ -1,110 +1,72 @@
+// app/dashboard/admin/page.tsx
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
-import CreateDoctorForm from "./CreateDoctorForm";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { redirect } from "next/navigation";
-
-export const dynamic = "force-dynamic";
+import CreateDoctorForm from "./CreateDoctorForm"; // We'll extract the form logic
 
 export default async function AdminDashboard() {
-  const session = await getServerSession(authOptions);
-
-  // 🔒 SECURITY CHECK: Only ADMINs allowed
-  if (!session || (session.user as any).role !== "ADMIN") {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-red-50 text-red-700">
-        <h1 className="text-3xl font-bold mb-2">⛔ Access Denied</h1>
-        <p className="mb-6">You do not have permission to view the Admin Dashboard.</p>
-        <Link href="/dashboard" className="bg-red-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-800">
-          Go Back to My Dashboard
-        </Link>
-      </div>
-    );
-  }
-  // Fetch Stats
-  const stats = {
-    users: await prisma.user.count(),
-    doctors: await prisma.specialist.count(),
-    bookings: await prisma.booking.count(),
-    revenue: (await prisma.booking.aggregate({ _sum: { amountPaid: true } }))._sum.amountPaid || 0,
-  };
-
-  const recentBookings = await prisma.booking.findMany({
-    take: 5,
-    orderBy: { createdAt: "desc" },
-    include: { user: true, specialist: true },
-  });
+  // Fetch Real Stats
+  const [totalDoctors, totalUsers, totalBookings, revenue] = await Promise.all([
+    prisma.specialist.count(),
+    prisma.user.count({ where: { role: "USER" } }),
+    prisma.booking.count(),
+    prisma.booking.aggregate({ _sum: { totalPrice: true } })
+  ]);
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-24 pb-12 px-4 sm:px-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
+    <div className="p-6 space-y-8">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-brand-600 to-brand-800 rounded-2xl p-8 text-white shadow-xl">
+        <h1 className="text-3xl font-bold mb-2">Admin Overview</h1>
+        <p className="opacity-90">Here's what's happening on your platform today.</p>
+      </div>
 
-        {/* 1. Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-          {[
-            { label: "Total Users", value: stats.users, color: "bg-blue-50 text-blue-600" },
-            { label: "Total Doctors", value: stats.doctors, color: "bg-purple-50 text-purple-600" },
-            { label: "Total Bookings", value: stats.bookings, color: "bg-orange-50 text-orange-600" },
-            { label: "Total Revenue", value: `₹${stats.revenue}`, color: "bg-green-50 text-green-600" },
-          ].map((stat, i) => (
-            <div key={i} className={`p-6 rounded-2xl border border-gray-100 shadow-sm ${stat.color}`}>
-              <p className="text-sm font-bold opacity-70 uppercase">{stat.label}</p>
-              <p className="text-3xl font-bold mt-1">{stat.value}</p>
-            </div>
-          ))}
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <StatCard title="Total Doctors" value={totalDoctors} icon="👨‍⚕️" color="blue" />
+        <StatCard title="Total Patients" value={totalUsers} icon="👥" color="green" />
+        <StatCard title="Appointments" value={totalBookings} icon="📅" color="purple" />
+        <StatCard title="Total Revenue" value={`₹${revenue._sum.totalPrice || 0}`} icon="💰" color="yellow" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Create Specialist Form Column */}
+        <div className="lg:col-span-2">
+           <CreateDoctorForm />
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          
-          {/* 2. Create Doctor Section */}
-          <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-              <h2 className="text-xl font-bold mb-4">Add New Specialist</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                This will create a login account and a public profile for the doctor.
-              </p>
-              <CreateDoctorForm />
-            </div>
-          </div>
-
-          {/* 3. Recent Bookings */}
-          <div className="lg:col-span-2">
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-              <h2 className="text-xl font-bold mb-4">Recent Bookings</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                    <tr>
-                      <th className="p-3">Patient</th>
-                      <th className="p-3">Doctor</th>
-                      <th className="p-3">Date</th>
-                      <th className="p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {recentBookings.map((b) => (
-                      <tr key={b.id} className="text-sm">
-                        <td className="p-3 font-medium">{b.user.name}</td>
-                        <td className="p-3">{b.specialist.name}</td>
-                        <td className="p-3">{new Date(b.date).toLocaleDateString()}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                            b.status === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : 
-                            b.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {b.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+        {/* Quick Actions / Recent Logs Column */}
+        <div className="bg-white rounded-2xl shadow-soft border border-gray-200 p-6 h-fit">
+           <h3 className="font-bold text-gray-900 mb-4">Quick Actions</h3>
+           <div className="space-y-3">
+              <button className="w-full text-left p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium transition">
+                 📄 Generate Monthly Report
+              </button>
+              <button className="w-full text-left p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium transition">
+                 ⚙️ Manage System Settings
+              </button>
+           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Simple Stat Card Component
+function StatCard({ title, value, icon, color }: any) {
+  const colors: any = {
+    blue: "bg-blue-50 text-blue-600",
+    green: "bg-green-50 text-green-600",
+    purple: "bg-purple-50 text-purple-600",
+    yellow: "bg-yellow-50 text-yellow-600",
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-soft border border-gray-200 flex items-center gap-4">
+      <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${colors[color]}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm text-gray-500 font-medium">{title}</p>
+        <p className="text-2xl font-bold text-gray-900">{value}</p>
       </div>
     </div>
   );

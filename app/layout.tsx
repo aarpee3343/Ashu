@@ -139,7 +139,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="flex-1 w-full pt-0">
               {children}
             </main>
-            {/* FIXED: Remove invalid theme property */}
             <Toaster 
               position="top-right"
               toastOptions={{

@@ -1,8 +1,3 @@
-// app/api/admin/create-specialist/route.ts
-
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
-
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -10,18 +5,12 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, email, password, category, price, experience, bio, image } = body;
+    const { name, email, password, category, price, experience, bio, image, isVideoAvailable, videoConsultationFee } = body;
 
-    // 0. Check if user exists
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return NextResponse.json({ error: "Email already exists" }, { status: 400 });
-    }
-
-    // 1. Hash Password
+    // 1. Create User
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // 2. Transaction
+    // Transaction
     await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -41,29 +30,17 @@ export async function POST(req: Request) {
           bio,
           image,
           userId: newUser.id,
-          commissionRate: Number(body.commissionRate || 20),
+          // SAVE VIDEO SETTINGS
+          isVideoAvailable: isVideoAvailable || false,
+          videoConsultationFee: videoConsultationFee ? Number(videoConsultationFee) : null,
           isVerified: true
         },
       });
     });
 
-    return NextResponse.json({ 
-      success: true,
-      message: "Specialist created successfully" 
-    });
-    
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Create specialist error:', error);
-    
-    // Better error response
-    return NextResponse.json(
-      { 
-        error: "Failed to create specialist",
-        details: process.env.NODE_ENV === 'development' ? 
-          (error instanceof Error ? error.message : 'Unknown error') : 
-          undefined
-      }, 
-      { status: 500 }
-    );
+    console.error(error);
+    return NextResponse.json({ error: "Failed to create doctor" }, { status: 500 });
   }
 }
