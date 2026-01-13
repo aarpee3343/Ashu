@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Calendar, CreditCard, User, Users, FileText, 
   MapPin, Clock, Eye, Download, Activity, X, 
   Plus, Save, ChevronRight, CheckCircle, Loader2 
-} from "lucide-react"; // ✅ Fixed: Added 'X' and others
+} from "lucide-react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,7 @@ export default function UserDashboardClient({ user }: any) {
 
   // Data States
   const [familyMembers, setFamilyMembers] = useState(user.familyMembers || []);
-  const [vitals, setVitals] = useState(user.vitals?.[0] || {}); // Assume 1 vital record for now
+  const [vitals, setVitals] = useState(user.vitals?.[0] || {}); 
   
   // Forms
   const [profileData, setProfileData] = useState({ 
@@ -38,6 +38,22 @@ export default function UserDashboardClient({ user }: any) {
     bloodGroup: vitals.type || ""
   });
   const [utrInput, setUtrInput] = useState("");
+
+  // --- SYNC EFFECTS ---
+  // Ensure family list updates if server data changes
+  useEffect(() => {
+    if (user.familyMembers) {
+      setFamilyMembers(user.familyMembers);
+    }
+  }, [user.familyMembers]);
+
+  // Polling for status updates (e.g. Doctor completes appointment)
+  useEffect(() => {
+    const interval = setInterval(() => {
+       router.refresh();
+    }, 10000); // Check every 10 seconds
+    return () => clearInterval(interval);
+  }, [router]);
 
   // --- ACTIONS ---
 
@@ -60,17 +76,11 @@ export default function UserDashboardClient({ user }: any) {
         });
         
         if(res.ok) {
-            const addedMember = await res.json(); // Get the created member from backend
-            
-            // ✅ FIX 2: Manually update local state immediately
+            const addedMember = await res.json();
             setFamilyMembers([...familyMembers, addedMember]); 
-            
             toast.success("Member Added"); 
             setShowFamilyModal(false);
-            
-            // Optional: clear form
             setNewMember({ name: "", relation: "", age: "", gender: "Male" });
-            
             router.refresh(); 
         } else {
             toast.error("Failed to add member");
@@ -84,8 +94,6 @@ export default function UserDashboardClient({ user }: any) {
 
   const handleSaveVitals = async () => {
     setLoading(true);
-    // Combine vitals into a single string or distinct fields based on your schema
-    // Here we use a pipe delimiter for simplicity in one "value" field, or mapped to DB
     const valueString = `${vitalForm.weight}|${vitalForm.height}|${vitalForm.bp}|${vitalForm.sugar}`;
     
     await fetch("/api/user/vitals", { 
@@ -102,6 +110,7 @@ export default function UserDashboardClient({ user }: any) {
     setLoading(true);
     
     // Simulate API call to update payment
+    // In a real app, you would hit an endpoint that verifies this UTR
     await fetch(`/api/bookings/${payModalData.id}`, {
         method: "PATCH",
         body: JSON.stringify({ action: "PAY_BALANCE", transactionId: utrInput })
@@ -150,7 +159,7 @@ export default function UserDashboardClient({ user }: any) {
             {user.bookings.length === 0 && <p className="text-center text-gray-400 mt-10">No appointments yet.</p>}
             {user.bookings.map((b: any) => (
               <div key={b.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative">
-                <div className={`absolute top-3 right-3 px-2 py-0.5 text-[10px] font-bold rounded ${b.status === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>{b.status}</div>
+                <div className={`absolute top-3 right-3 px-2 py-0.5 text-[10px] font-bold rounded ${b.status === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : b.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>{b.status}</div>
                 <div className="flex gap-4">
                   <div className="bg-gray-100 w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-gray-600">
                     <span className="text-lg">{format(new Date(b.date), "d")}</span>
@@ -167,7 +176,7 @@ export default function UserDashboardClient({ user }: any) {
                 {/* Action Buttons */}
                 <div className="mt-4 flex gap-2">
                    {b.locationType === 'VIDEO' && b.status === 'UPCOMING' && (
-                     <a href={`/room/${b.id}`} className="flex-1 bg-purple-600 text-white text-center py-2 rounded-lg text-sm font-bold">Join Call</a>
+                     <a href={`/room/${b.id}`} className="flex-1 bg-purple-600 text-white text-center py-2 rounded-lg text-sm font-bold shadow-lg shadow-purple-100">Join Call</a>
                    )}
                 </div>
               </div>
@@ -180,6 +189,9 @@ export default function UserDashboardClient({ user }: any) {
           <div className="space-y-3">
              {user.bookings.map((b: any) => {
                const due = b.totalPrice - b.amountPaid;
+               // Logic Fix: If status is COMPLETED, assume settled.
+               const isPaid = b.amountPaid >= b.totalPrice || b.status === 'COMPLETED';
+               
                return (
                <div key={b.id} className="bg-white p-4 rounded-xl border border-gray-100 flex justify-between items-center">
                   <div>
@@ -188,7 +200,7 @@ export default function UserDashboardClient({ user }: any) {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-gray-900">₹{b.totalPrice}</p>
-                    {due <= 0 ? (
+                    {isPaid ? (
                        <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded font-bold">PAID</span>
                     ) : (
                        <div className="flex flex-col items-end gap-1">
@@ -196,7 +208,7 @@ export default function UserDashboardClient({ user }: any) {
                          <button onClick={() => setPayModalData(b)} className="text-[10px] bg-black text-white px-2 py-1 rounded font-bold">Pay Balance</button>
                        </div>
                     )}
-                    {due <= 0 && (
+                    {isPaid && (
                        <button onClick={() => toast.success("Invoice Downloading...")} className="block mt-1 text-[10px] text-blue-600 underline">Invoice</button>
                     )}
                   </div>
@@ -325,8 +337,9 @@ export default function UserDashboardClient({ user }: any) {
                  </div>
                  <div className="flex justify-between py-2 border-b">
                     <span className="text-gray-500">Fee Status</span>
-                    <span className={selectedBooking.amountPaid >= selectedBooking.totalPrice ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                        {selectedBooking.amountPaid >= selectedBooking.totalPrice ? "Paid Full" : `Due ₹${selectedBooking.totalPrice - selectedBooking.amountPaid}`}
+                    {/* Fixed Display Logic in Modal too */}
+                    <span className={(selectedBooking.amountPaid >= selectedBooking.totalPrice || selectedBooking.status === 'COMPLETED') ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                        {(selectedBooking.amountPaid >= selectedBooking.totalPrice || selectedBooking.status === 'COMPLETED') ? "Paid Full" : `Due ₹${selectedBooking.totalPrice - selectedBooking.amountPaid}`}
                     </span>
                  </div>
                  

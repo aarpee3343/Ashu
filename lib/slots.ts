@@ -1,37 +1,40 @@
-import { addMinutes, format, parse, startOfDay, addHours } from "date-fns";
+import { addMinutes, format, parse, addHours, isToday, isBefore, startOfHour } from "date-fns";
 
-// 1. VIDEO: 15 Minute Slots
-export const generateVideoSlots = () => {
+export const generateVideoSlots = (date: Date = new Date()) => {
   const slots = [];
-  let currentTime = parse("10:00 AM", "h:mm a", new Date());
-  const endTime = parse("05:00 PM", "h:mm a", new Date());
+  const now = new Date();
+  
+  // Start 10 AM, End 9 PM
+  let currentTime = parse("10:00 AM", "h:mm a", date);
+  const endTime = parse("09:00 PM", "h:mm a", date);
 
   while (currentTime < endTime) {
-    slots.push(format(currentTime, "h:mm a"));
+    // If date is today, ONLY show future slots (with 30 min buffer)
+    if (!isToday(date) || isBefore(addMinutes(now, 30), currentTime)) {
+      slots.push(format(currentTime, "h:mm a"));
+    }
     currentTime = addMinutes(currentTime, 15);
   }
   return slots;
 };
 
-// 2. HOME: 1 Hour Slots
-export const generateHomeSlots = () => {
+export const generateHomeSlots = (date: Date = new Date()) => {
   const slots = [];
-  let currentTime = parse("07:00 AM", "h:mm a", new Date());
-  const endTime = parse("06:00 PM", "h:mm a", new Date());
+  const now = new Date();
+  
+  let currentTime = parse("07:00 AM", "h:mm a", date);
+  const endTime = parse("07:00 PM", "h:mm a", date);
 
   while (currentTime < endTime) {
-    slots.push(format(currentTime, "h:mm a"));
+    if (!isToday(date) || isBefore(addMinutes(now, 60), currentTime)) {
+      slots.push(format(currentTime, "h:mm a"));
+    }
     currentTime = addHours(currentTime, 1);
   }
   return slots;
 };
 
-// 3. CLINIC: Flexible Windows (Standard)
+// ... clinic slots logic remains similar (custom strings are harder to filter automatically without parsing)
 export const generateClinicSlots = () => {
-  return [
-    "09:00 AM - 11:00 AM",
-    "11:00 AM - 01:00 PM",
-    "02:00 PM - 04:00 PM",
-    "04:00 PM - 07:00 PM"
-  ];
-};
+    return ["09:00 - 11:00", "11:00 - 13:00", "14:00 - 16:00", "16:00 - 19:00"];
+}

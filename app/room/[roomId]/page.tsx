@@ -10,9 +10,9 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
   const { data: session } = useSession();
   const router = useRouter();
   const roomID = params.roomId;
-  const zpRef = useRef<any>(null); // Use Ref to persist instance
+  const zpRef = useRef<any>(null);
 
-  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 Mins
+  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 Mins Countdown
   const [isJoined, setIsJoined] = useState(false);
 
   // 1. TIMER LOGIC
@@ -37,14 +37,15 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
 
       const { ZegoUIKitPrebuilt } = await import("@zegocloud/zego-uikit-prebuilt");
 
-      const appID = 2076410495; // Your App ID
-      const serverSecret = "56fdfab53961f61f87096fddffaafc22"; // Your Secret
+      const appID = 2076410495; 
+      const serverSecret = "56fdfab53961f61f87096fddffaafc22";
 
+      // ⚠️ CRITICAL FIX: Zego requires UserID and RoomID to be STRINGS
       const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
         appID,
         serverSecret,
-        roomID,
-        (session.user as any).id,
+        String(roomID), 
+        String((session.user as any).id), 
         session.user.name || "User"
       );
 
@@ -58,10 +59,10 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
         ],
         scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
         showScreenSharingButton: true,
-        showLeavingView: false, // We handle leaving manually
+        showLeavingView: false, 
         onJoinRoom: () => {
            setIsJoined(true);
-           toast.success("Connected! 15 min timer started.");
+           toast.success("Connected! Timer started.");
         },
         onLeaveRoom: () => {
            router.push('/dashboard/user');
@@ -82,11 +83,9 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
     if(zpRef.current) {
         zpRef.current.destroy();
     }
-    // Update DB status here via fetch if needed
     router.push("/dashboard/user");
   };
 
-  // Helper: Format Time
   const formatTime = (s: number) => {
     const mins = Math.floor(s / 60);
     const secs = s % 60;

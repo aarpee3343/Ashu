@@ -282,4 +282,5 @@ enum BookingStatus {
   UPCOMING
   COMPLETED
   CANCELLED
+  SKIPPED
 }

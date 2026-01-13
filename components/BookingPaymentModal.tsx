@@ -91,20 +91,30 @@ export default function BookingPaymentModal({
 
   // --- 3. FILE UPLOAD ---
   const handleFileUpload = async (e: any) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    const promise = fetch("/api/upload", { method: "POST", body: formData }).then(res => res.json());
-    toast.promise(promise, {
-       loading: 'Uploading...',
-       success: (data) => {
-          if(data.success) { setMedicalDocs(data.url); return "Attached!"; }
-          else throw new Error("Failed");
-       },
-       error: 'Upload failed'
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const toastId = toast.loading("Uploading document...");
+
+  try {
+    // Call the new Vercel Blob API
+    const response = await fetch(`/api/upload?filename=${file.name}`, {
+      method: 'POST',
+      body: file,
     });
-  };
+
+    const newBlob = await response.json();
+
+    if (newBlob.url) {
+      setMedicalDocs(newBlob.url); // Save the public URL to state
+      toast.success("Attached successfully!", { id: toastId });
+    } else {
+      throw new Error("Upload failed");
+    }
+  } catch (error) {
+    toast.error("Upload failed", { id: toastId });
+  }
+};
 
   // --- 4. CONFIRM BOOKING ---
   const handleConfirmBooking = async () => {
