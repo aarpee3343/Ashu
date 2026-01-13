@@ -21,6 +21,7 @@ export default function BookingWizard({
   const [address, setAddress] = useState("");
   const [homeDays, setHomeDays] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [busySlots, setBusySlots] = useState<string[]>([]); // <--- NEW: Track busy slots
   
   // Payment States
   const [paymentMethod, setPaymentMethod] = useState<"ONLINE" | "CASH">("ONLINE");
@@ -31,29 +32,46 @@ export default function BookingWizard({
     if(isOpen) {
       setStep(1);
       setTransactionId("");
-      // Default to Online
       setPaymentMethod("ONLINE");
-      // Auto-select clinic if only one exists
       if(mode === 'CLINIC' && specialist.clinics?.length === 1) {
         setSelectedClinicId(specialist.clinics[0].id);
       }
     } 
   }, [isOpen, mode, specialist]);
 
-  // Pricing & Slots
-  const slots = mode === 'VIDEO' ? generateVideoSlots() : mode === 'HOME' ? generateHomeSlots() : generateClinicSlots();
+  // --- NEW: FETCH AVAILABILITY WHEN DATE CHANGES ---
+  useEffect(() => {
+    const fetchAvailability = async () => {
+        setBusySlots([]); // Reset
+        try {
+            const dateStr = format(selectedDate, "yyyy-MM-dd");
+            const res = await fetch(`/api/slots/availability?specialistId=${specialist.id}&date=${dateStr}`);
+            const data = await res.json();
+            if(data.bookedSlots) {
+                setBusySlots(data.bookedSlots);
+            }
+        } catch (e) {
+            console.error("Failed to check availability");
+        }
+    };
+    fetchAvailability();
+  }, [selectedDate, specialist.id]);
+
+  // Generate Slots based on Mode
+  const allSlots = mode === 'VIDEO' ? generateVideoSlots(selectedDate) 
+                 : mode === 'HOME' ? generateHomeSlots(selectedDate) 
+                 : generateClinicSlots();
+
   const dateStrip = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
   const basePrice = mode === 'VIDEO' ? (specialist.videoConsultationFee || specialist.price) : specialist.price;
   const totalPrice = basePrice * (mode === 'HOME' ? homeDays : 1);
 
   // --- HANDLERS ---
   const handleNext = () => {
-    // Validation Step 1
     if (step === 1) {
       if (mode === 'CLINIC' && !selectedClinicId) return toast.error("Please select a clinic location");
       if (!selectedSlot) return toast.error("Please select a time slot");
     }
-    // Validation Step 2
     if (step === 2) {
       if (mode === 'HOME' && !address) return toast.error("Home address is required");
     }
@@ -61,7 +79,6 @@ export default function BookingWizard({
   };
 
   const handleBook = async () => {
-    // Validation: Require UTR only if Paying Online
     if (paymentMethod === "ONLINE" && (!transactionId || transactionId.length < 5)) {
       return toast.error("Please enter a valid Payment Reference / UTR");
     }
@@ -79,8 +96,6 @@ export default function BookingWizard({
         duration: homeDays,
         clinicId: mode === 'CLINIC' ? Number(selectedClinicId) : null,
         familyMemberId: patientId === "SELF" ? null : Number(patientId),
-        
-        // Dynamic Payment Data
         paymentType: paymentMethod === "ONLINE" ? "UPI_ONLINE" : "PAY_ON_SERVICE",
         amountPaid: paymentMethod === "ONLINE" ? totalPrice : 0,
         transactionId: paymentMethod === "ONLINE" ? transactionId : null
@@ -92,16 +107,11 @@ export default function BookingWizard({
       });
 
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error || "Booking failed");
       
-      const successMsg = paymentMethod === "ONLINE" 
-        ? "Payment sent for verification!" 
-        : "Booking Confirmed! Pay at clinic.";
-        
-      toast.success(successMsg);
+      toast.success(paymentMethod === "ONLINE" ? "Payment sent for verification!" : "Booking Confirmed!");
       router.push("/dashboard/user");
-      router.refresh(); // Refresh to show new booking
+      router.refresh(); 
       onClose();
     } catch (err: any) {
       toast.error(err.message || "Server Error");
@@ -119,12 +129,8 @@ export default function BookingWizard({
         {/* HEADER */}
         <div className="p-5 border-b flex items-center justify-between bg-white rounded-t-[30px]">
           {step > 1 ? (
-            <button onClick={() => setStep(step - 1)} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full">
-              <ChevronLeft />
-            </button>
-          ) : (
-             <div className="w-10" /> 
-          )}
+            <button onClick={() => setStep(step - 1)} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft /></button>
+          ) : <div className="w-10" />}
           <h3 className="font-bold text-lg">
             {step === 1 && (mode === 'CLINIC' ? "Location & Time" : "Select Slot")}
             {step === 2 && "Patient Details"}
@@ -136,11 +142,8 @@ export default function BookingWizard({
         {/* CONTENT */}
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
           
-          {/* STEP 1: CLINIC (If Applicable) + DATE + TIME */}
           {step === 1 && (
             <div className="space-y-6">
-              
-              {/* Clinic Selector */}
               {mode === 'CLINIC' && (
                  <div>
                    <p className="text-xs font-bold text-gray-400 uppercase mb-3">Select Clinic</p>
@@ -155,9 +158,7 @@ export default function BookingWizard({
                            <p className="text-xs text-gray-500">{c.city}, {c.state}</p>
                          </div>
                        </button>
-                     )) : (
-                       <p className="text-sm text-red-500">No clinics found for this doctor.</p>
-                     )}
+                     )) : <p className="text-sm text-red-500">No clinics found for this doctor.</p>}
                    </div>
                  </div>
               )}
@@ -167,7 +168,8 @@ export default function BookingWizard({
                 <p className="text-xs font-bold text-gray-400 uppercase mb-3">Select Date</p>
                 <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                    {dateStrip.map((date) => (
-                     <button key={date.toString()} onClick={() => setSelectedDate(date)} className={`flex-shrink-0 w-16 h-20 rounded-2xl flex flex-col items-center justify-center border transition-all ${isSameDay(date, selectedDate) ? "bg-black text-white scale-105" : "border-gray-200"}`}>
+                     <button key={date.toString()} onClick={() => { setSelectedDate(date); setSelectedSlot(""); }} 
+                        className={`flex-shrink-0 w-16 h-20 rounded-2xl flex flex-col items-center justify-center border transition-all ${isSameDay(date, selectedDate) ? "bg-black text-white scale-105" : "border-gray-200"}`}>
                         <span className="text-xs font-bold">{format(date, "EEE")}</span>
                         <span className="text-xl font-bold">{format(date, "d")}</span>
                      </button>
@@ -175,31 +177,43 @@ export default function BookingWizard({
                 </div>
               </div>
 
-              {/* Time Slots */}
+              {/* Time Slots - NOW WITH BUSY CHECK */}
               <div>
                  <p className="text-xs font-bold text-gray-400 uppercase mb-3">Select Time</p>
                  <div className="grid grid-cols-3 gap-3">
-                   {slots.map((slot) => (
-                     <button key={slot} onClick={() => setSelectedSlot(slot)} className={`py-3 rounded-xl text-sm font-bold border transition-all ${selectedSlot === slot ? "bg-blue-600 text-white shadow-md" : "border-gray-200"}`}>{slot}</button>
-                   ))}
+                   {allSlots.map((slot) => {
+                     // Check if this specific slot string exists in the busySlots array from API
+                     const isBusy = busySlots.includes(slot);
+                     return (
+                       <button 
+                         key={slot} 
+                         onClick={() => !isBusy && setSelectedSlot(slot)} 
+                         disabled={isBusy}
+                         className={`py-3 rounded-xl text-xs font-bold border transition-all relative ${
+                            isBusy ? "bg-gray-100 text-gray-400 cursor-not-allowed border-transparent" : 
+                            selectedSlot === slot ? "bg-blue-600 text-white shadow-md border-blue-600" : "border-gray-200 hover:border-blue-300"
+                         }`}
+                       >
+                         {slot}
+                         {isBusy && <span className="block text-[8px] text-red-400 mt-0.5">BOOKED</span>}
+                       </button>
+                     )
+                   })}
                  </div>
+                 {allSlots.length === 0 && <p className="text-sm text-gray-400 text-center mt-4">No slots available for this date.</p>}
               </div>
             </div>
           )}
 
-          {/* STEP 2: PATIENT & ADDRESS */}
+          {/* ... Step 2 and 3 remain exactly same as previous code ... */}
           {step === 2 && (
              <div className="space-y-4">
                 <p className="font-bold text-gray-500 text-xs uppercase">Who is this for?</p>
-                
-                {/* Self Selection */}
                 <div onClick={() => setPatientId("SELF")} className={`p-4 border rounded-xl flex items-center gap-3 cursor-pointer transition-all ${patientId === "SELF" ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "hover:bg-gray-50"}`}>
                    <div className="w-8 h-8 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs font-bold">{user.name?.charAt(0)}</div>
                    <div className="flex-1 font-bold">Myself</div>
                    {patientId === "SELF" && <CheckCircle className="text-blue-600" size={18} />}
                 </div>
-
-                {/* Family Selection */}
                 {user.familyMembers?.map((m: any) => (
                    <div key={m.id} onClick={() => setPatientId(String(m.id))} className={`p-4 border rounded-xl flex items-center gap-3 cursor-pointer transition-all ${patientId === String(m.id) ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "hover:bg-gray-50"}`}>
                       <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold">{m.name.charAt(0)}</div>
@@ -207,8 +221,6 @@ export default function BookingWizard({
                       {patientId === String(m.id) && <CheckCircle className="text-blue-600" size={18} />}
                    </div>
                 ))}
-
-                {/* Home Address Input */}
                 {mode === 'HOME' && (
                   <div className="pt-2 animate-fade-in">
                     <p className="font-bold text-gray-500 text-xs uppercase mb-2">Visit Address</p>
@@ -222,59 +234,32 @@ export default function BookingWizard({
              </div>
           )}
 
-          {/* STEP 3: PAYMENT */}
           {step === 3 && (
             <div className="space-y-6">
               <div className="text-center">
                 <p className="text-gray-400 text-sm">Total Payable</p>
                 <h1 className="text-4xl font-bold text-gray-900">₹{totalPrice}</h1>
               </div>
-
-              {/* Method Selection */}
               <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => setPaymentMethod("ONLINE")}
-                  className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === "ONLINE" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-100 text-gray-500"}`}
-                >
-                  <CreditCard size={24} />
-                  <span className="font-bold text-sm">Pay Now</span>
+                <button onClick={() => setPaymentMethod("ONLINE")} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === "ONLINE" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-100 text-gray-500"}`}>
+                  <CreditCard size={24} /><span className="font-bold text-sm">Pay Now</span>
                 </button>
-
-                <button 
-                  onClick={() => mode !== 'VIDEO' && setPaymentMethod("CASH")}
-                  disabled={mode === 'VIDEO'}
-                  className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
-                    mode === 'VIDEO' ? "opacity-40 cursor-not-allowed bg-gray-50" : 
-                    paymentMethod === "CASH" ? "border-green-600 bg-green-50 text-green-700" : "border-gray-100 text-gray-500"
-                  }`}
-                >
-                  <Banknote size={24} />
-                  <span className="font-bold text-sm">Pay Later</span>
+                <button onClick={() => mode !== 'VIDEO' && setPaymentMethod("CASH")} disabled={mode === 'VIDEO'} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${mode === 'VIDEO' ? "opacity-40 cursor-not-allowed bg-gray-50" : paymentMethod === "CASH" ? "border-green-600 bg-green-50 text-green-700" : "border-gray-100 text-gray-500"}`}>
+                  <Banknote size={24} /><span className="font-bold text-sm">Pay Later</span>
                   {mode === 'VIDEO' && <span className="text-[9px] text-red-500 font-bold">Prepaid Only</span>}
                 </button>
               </div>
-
-              {/* Conditional UI */}
               {paymentMethod === "ONLINE" ? (
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center animate-fade-in">
                    <p className="text-xs font-bold text-blue-600 uppercase mb-3">Scan UPI QR</p>
-                   <div className="w-40 h-40 bg-white mx-auto p-2 rounded-lg mb-4 border border-dashed border-gray-300">
+                   <div className="w-32 h-32 bg-white mx-auto p-2 rounded-lg mb-4 border border-dashed border-gray-300">
                       <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=care@revivehub.co.in&pn=ReviveHub&am=${totalPrice}&cu=INR`} alt="QR" className="w-full h-full object-contain" />
                    </div>
-                   <input 
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      placeholder="Enter UTR / Ref No."
-                      className="w-full p-3 border rounded-xl text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-600 outline-none"
-                      maxLength={12}
-                   />
-                   <p className="text-[10px] text-gray-500 mt-2">Enter the 12-digit UTR from your payment app.</p>
+                   <input value={transactionId} onChange={(e) => setTransactionId(e.target.value)} placeholder="Enter UTR / Ref No." className="w-full p-3 border rounded-xl text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-600 outline-none" maxLength={12} />
                 </div>
               ) : (
                 <div className="bg-green-50 p-6 rounded-xl border border-green-100 text-center animate-fade-in">
-                   <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <CheckCircle size={24} />
-                   </div>
+                   <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2"><CheckCircle size={24} /></div>
                    <h3 className="font-bold text-green-800">Pay at Service</h3>
                    <p className="text-xs text-green-600 mt-1">Please pay ₹{totalPrice} directly to the doctor via Cash or UPI.</p>
                 </div>
@@ -283,13 +268,11 @@ export default function BookingWizard({
           )}
         </div>
 
-        {/* FOOTER */}
         <div className="p-5 border-t bg-white">
            <button onClick={step < 3 ? handleNext : handleBook} disabled={loading} className="w-full py-4 bg-black text-white font-bold rounded-xl text-lg hover:scale-[1.01] transition-transform flex items-center justify-center gap-2">
              {loading ? <Loader2 className="animate-spin" /> : (step < 3 ? "Continue" : (paymentMethod === "ONLINE" ? "Verify & Book" : "Confirm Booking"))}
            </button>
         </div>
-
       </div>
     </div>
   );

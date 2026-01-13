@@ -7,7 +7,7 @@ import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Video, MapPin, Clock, CreditCard, FileText, CheckCircle, X, UploadCloud, CalendarCheck, IndianRupee } from "lucide-react";
+import { Video, MapPin, Clock, CreditCard, FileText, CheckCircle, X } from "lucide-react";
 
 const ALL_TIMES = [
   "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
@@ -17,42 +17,8 @@ const ALL_TIMES = [
 export default function DoctorDashboardClient({ specialist }: any) {
   const router = useRouter();
   
-  // --- STATE MANAGEMENT ---
+  // Tab Persistence
   const [activeTab, setActiveTab] = useState("APPOINTMENTS");
-  
-  // Calendar & Slots
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedSlotDate, setSelectedSlotDate] = useState<Date>(new Date());
-  const [selectedSlotsForAction, setSelectedSlotsForAction] = useState<string[]>([]);
-  
-  // Modals
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [sessionModalOpen, setSessionModalOpen] = useState(false); // For Multi-day sessions
-  const [completeModalOpen, setCompleteModalOpen] = useState(false); // For Final Rx
-  const [detailsModalOpen, setDetailsModalOpen] = useState(false); // For Viewing Info
-
-  // Forms
-  const [rxForm, setRxForm] = useState({ diagnosis: "", advice: "", medicines: "" });
-  const [uploadedRxUrl, setUploadedRxUrl] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-  
-  // Session Logic
-  const [currentSessionCost, setCurrentSessionCost] = useState(0);
-  const [cashCollectedCheck, setCashCollectedCheck] = useState(false);
-
-  // Settings Forms
-  const [bankForm, setBankForm] = useState(specialist.bankAccount || { accountHolder: "", accountNumber: "", bankName: "", ifscCode: "" });
-  const [profileForm, setProfileForm] = useState({
-    bio: specialist.bio,
-    experience: specialist.experience,
-    price: specialist.price,
-    qualifications: specialist.qualifications,
-    hospitals: specialist.hospitals,
-    isVideoAvailable: specialist.isVideoAvailable,
-    videoConsultationFee: specialist.videoConsultationFee
-  });
-
-  // --- PERSISTENCE ---
   useEffect(() => {
     const saved = localStorage.getItem("doctorTab");
     if (saved) setActiveTab(saved);
@@ -63,20 +29,65 @@ export default function DoctorDashboardClient({ specialist }: any) {
     localStorage.setItem("doctorTab", tab);
   };
 
-  // --- FINANCIAL CALCULATIONS ---
+  // State
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedSlotDate, setSelectedSlotDate] = useState<Date>(new Date());
+  const [selectedSlotsForAction, setSelectedSlotsForAction] = useState<string[]>([]);
+  
+  // Modals
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
+
+  // Completion Forms
+  const [otpInput, setOtpInput] = useState("");
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [prescription, setPrescription] = useState("");
+  const [cashCollectedCheck, setCashCollectedCheck] = useState(false);
+  
+  // Settings Forms
+  const [bankForm, setBankForm] = useState(specialist.bankAccount || { accountHolder: "", accountNumber: "", bankName: "", ifscCode: "" });
+  
+  const [profileForm, setProfileForm] = useState({
+    bio: specialist.bio,
+    experience: specialist.experience,
+    price: specialist.price,
+    qualifications: specialist.qualifications,
+    hospitals: specialist.hospitals,
+    isVideoAvailable: specialist.isVideoAvailable,
+    videoConsultationFee: specialist.videoConsultationFee
+  });
+
+  // Financials
   const totalRevenue = specialist.bookings.reduce((sum: number, b: any) => sum + b.totalPrice, 0);
   const cashCollected = specialist.bookings.filter((b: any) => b.paymentType === "PAY_ON_SERVICE").reduce((sum: number, b: any) => sum + (b.amountPaid || 0), 0);
   const onlineCollected = specialist.bookings.filter((b: any) => b.paymentType === "UPI_ONLINE" || b.paymentType === "ONLINE_ADVANCE").reduce((sum: number, b: any) => sum + b.amountPaid, 0);
   const totalCommission = Math.round((totalRevenue * specialist.commissionRate) / 100);
   const payoutEligibleAmount = onlineCollected - totalCommission;
 
-  // --- ACTIONS: SLOTS ---
+  // --- ACTIONS ---
+
+  // ✅ ADDED THIS MISSING FUNCTION
   const toggleSlotSelection = (time: string) => {
     if (selectedSlotsForAction.includes(time)) {
       setSelectedSlotsForAction(prev => prev.filter(t => t !== time));
     } else {
       setSelectedSlotsForAction(prev => [...prev, time]);
     }
+  };
+
+  const handleUpdateProfile = async () => {
+    const loadingId = toast.loading("Updating...");
+    try {
+      const res = await fetch("/api/doctor/profile", {
+        method: "PATCH",
+        body: JSON.stringify(profileForm)
+      });
+      if(!res.ok) throw new Error();
+      toast.success("Profile Updated", { id: loadingId });
+      router.refresh();
+    } catch { toast.error("Update failed", { id: loadingId }); }
   };
 
   const handleBulkSlotAction = async (action: "BLOCK" | "OPEN") => {
@@ -96,113 +107,33 @@ export default function DoctorDashboardClient({ specialist }: any) {
     } catch { toast.error("Failed", { id: toastId }); }
   };
 
-  // --- ACTIONS: PROFILE & BANK ---
-  const handleUpdateProfile = async () => {
-    const loadingId = toast.loading("Updating...");
-    try {
-      const res = await fetch("/api/doctor/profile", { method: "PATCH", body: JSON.stringify(profileForm) });
-      if(!res.ok) throw new Error();
-      toast.success("Profile Updated", { id: loadingId });
-      router.refresh();
-    } catch { toast.error("Update failed", { id: loadingId }); }
-  };
+  const verifyOtpAndComplete = async () => {
+    // Validation
+    if (selectedBooking.locationType !== 'VIDEO' && otpInput !== generatedOtp) return toast.error("Invalid OTP");
+    if (!prescription || prescription.length < 10) return toast.error("Please write a prescription/note");
 
-  const handleSaveBank = async () => {
-    await fetch("/api/doctor/bank", { method: "POST", body: JSON.stringify(bankForm) });
-    toast.success("Bank Saved");
-    router.refresh();
-  };
-
-  // --- ACTIONS: APPOINTMENT HANDLING ---
-
-  // 1. Open Correct Modal (Session vs Completion)
-  const openActionModal = (booking: any) => {
-    setSelectedBooking(booking);
-    setCashCollectedCheck(false); // Reset check
-    
-    // Logic: If duration > 1, open Session Manager. Else open Final Completion.
-    if (booking.duration > 1) {
-        setCurrentSessionCost(booking.totalPrice / booking.duration);
-        setSessionModalOpen(true);
-    } else {
-        setCurrentSessionCost(booking.totalPrice);
-        setCompleteModalOpen(true);
+    let amount = 0;
+    if (selectedBooking.paymentType === "PAY_ON_SERVICE") {
+      if (!cashCollectedCheck) return toast.error("Confirm cash collection");
+      amount = selectedBooking.totalPrice;
     }
-  };
 
-  // 2. Upload Prescription File
-  const handleUpload = async (e: any) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIsUploading(true);
+    const toastId = toast.loading("Completing appointment...");
     try {
-        const res = await fetch(`/api/upload?filename=${file.name}`, { method: "POST", body: file });
-        const blob = await res.json();
-        setUploadedRxUrl(blob.url);
-        toast.success("File attached");
-    } catch { toast.error("Upload failed"); } 
-    finally { setIsUploading(false); }
-  };
-
-  // 3. Mark ONE DAY as Done (For Physio/Home visits)
-  const markSessionDone = async (logId: number) => {
-    const toastId = toast.loading("Updating session...");
-    
-    // A. Mark Log as Completed
-    await fetch("/api/doctor/daily-logs", {
+      await fetch(`/api/bookings/${selectedBooking.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ logId, status: "COMPLETED" })
-    });
-
-    // B. Add Cash (If collected)
-    if (cashCollectedCheck) {
-        await fetch(`/api/bookings/${selectedBooking.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ action: "ADD_PAYMENT", amount: currentSessionCost })
-        });
-    }
-
-    toast.success("Session Marked Done", { id: toastId });
-    setCashCollectedCheck(false);
-    router.refresh();
-    
-    // Close session modal for UX refresh
-    setSessionModalOpen(false); 
-  };
-
-  // 4. Final Completion (Structured Rx)
-  const completeBooking = async () => {
-    if (!rxForm.diagnosis && !uploadedRxUrl) return toast.error("Please add diagnosis or upload file");
-    
-    const toastId = toast.loading("Generating report...");
-    
-    // Create structured object
-    const finalRx = JSON.stringify({ 
-        diagnosis: rxForm.diagnosis,
-        advice: rxForm.advice,
-        medicines: rxForm.medicines,
-        file: uploadedRxUrl 
-    });
-
-    const amountToAdd = cashCollectedCheck ? currentSessionCost : 0;
-
-    try {
-        await fetch(`/api/bookings/${selectedBooking.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ 
-              action: "UPDATE_STATUS", 
-              status: "COMPLETED", 
-              amountCollected: amountToAdd, 
-              prescription: finalRx 
-          }),
-        });
-        toast.success("Booking Completed Successfully!", { id: toastId });
-        setCompleteModalOpen(false);
-        setRxForm({ diagnosis: "", advice: "", medicines: "" });
-        router.refresh();
-    } catch {
-        toast.error("Failed to complete", { id: toastId });
-    }
+        body: JSON.stringify({ 
+            action: "UPDATE_STATUS", 
+            status: "COMPLETED", 
+            amountCollected: amount,
+            prescription: prescription 
+        }),
+      });
+      toast.success("Marked as Completed!", { id: toastId });
+      setCompleteModalOpen(false);
+      setPrescription("");
+      router.refresh();
+    } catch { toast.error("Error updating status", { id: toastId }); }
   };
 
   const calendarDays = useMemo(() => eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) }), [currentDate]);
@@ -211,7 +142,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
     <div className="min-h-screen bg-gray-50 pt-24 pb-12 px-4 md:px-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* HEADER */}
+        {/* Header */}
         <div className="bg-white p-6 rounded-3xl border border-gray-100 mb-8 flex flex-col md:flex-row gap-6 shadow-sm items-center">
            <div className="relative w-24 h-24">
              <Image src={specialist.image || "/default-doctor.png"} alt="Profile" fill className="rounded-full object-cover border-4 border-gray-50" />
@@ -226,7 +157,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
            </div>
         </div>
 
-        {/* NAVIGATION TABS */}
+        {/* Navigation Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto no-scrollbar pb-2">
            {[
              { id: "APPOINTMENTS", label: "Appointments" },
@@ -242,18 +173,17 @@ export default function DoctorDashboardClient({ specialist }: any) {
            <button onClick={() => signOut()} className="ml-auto text-red-600 font-bold text-sm px-4 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">Log Out</button>
         </div>
 
-        {/* --- TAB 1: APPOINTMENTS --- */}
+        {/* 1. APPOINTMENTS TAB */}
         {activeTab === "APPOINTMENTS" && (
           <div className="space-y-4">
             {specialist.bookings.length === 0 && (
                 <div className="bg-white p-12 text-center rounded-3xl border border-dashed border-gray-300">
-                    <p className="text-gray-400 font-medium">No appointments found.</p>
+                    <p className="text-gray-400 font-medium">No appointments scheduled yet.</p>
                 </div>
             )}
             
             {specialist.bookings.map((b: any) => (
               <div key={b.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row justify-between gap-6 relative overflow-hidden">
-                {/* Color Strip Status */}
                 <div className={`absolute left-0 top-0 bottom-0 w-2 ${b.status === 'COMPLETED' ? 'bg-green-500' : b.status === 'CANCELLED' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
                 
                 <div className="pl-4">
@@ -267,22 +197,19 @@ export default function DoctorDashboardClient({ specialist }: any) {
                       {format(new Date(b.date), "EEEE, dd MMM")} • <span className="text-black">{b.slotTime}</span>
                   </p>
 
-                  <div className="flex items-center gap-3 text-xs font-bold">
-                     {/* Multi Day Badge */}
-                     {b.duration > 1 && (
-                        <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded flex items-center gap-1"><CalendarCheck size={12}/> {b.duration} Day Plan</span>
-                     )}
-                     
-                     {/* Payment Status Badge */}
-                     <span className={`flex items-center gap-1 px-2 py-1 rounded ${b.amountPaid >= b.totalPrice ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        <IndianRupee size={12} /> {b.amountPaid >= b.totalPrice ? 'PAID FULL' : `DUE: ₹${b.totalPrice - b.amountPaid}`}
+                  <div className="flex items-center gap-4 text-xs font-bold">
+                     <span className={`flex items-center gap-1 ${b.paymentType.includes('ONLINE') ? 'text-blue-600' : 'text-orange-600'}`}>
+                        <CreditCard size={12} /> {b.paymentType.includes('ONLINE') ? 'PAID ONLINE' : 'CASH / UNPAID'}
                      </span>
+                     {b.medicalCondition?.includes("UTR") && (
+                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">Ref: {b.medicalCondition}</span>
+                     )}
                   </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 items-center justify-center pl-4">
                    <button onClick={() => { setSelectedBooking(b); setDetailsModalOpen(true); }} className="w-full sm:w-auto px-5 py-2.5 border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors">
-                      Details
+                      View Details
                    </button>
                    
                    {b.status === "UPCOMING" && (
@@ -293,21 +220,23 @@ export default function DoctorDashboardClient({ specialist }: any) {
                              target="_blank"
                              className="w-full sm:w-auto bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200"
                            >
-                              <Video size={16} /> Join Call
+                              <Video size={16} /> Start Call
                            </Link>
                         )}
-                        
-                        {/* SMART ACTION BUTTON */}
                         <button 
-                            onClick={() => openActionModal(b)} 
+                            onClick={() => { 
+                                setGeneratedOtp(Math.floor(1000 + Math.random() * 9000).toString()); 
+                                setSelectedBooking(b); 
+                                setCompleteModalOpen(true); 
+                            }} 
                             className="w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
                         >
-                           {b.duration > 1 ? "Manage Sessions" : "Complete"}
+                           Complete
                         </button>
                       </>
                    )}
                    {b.status === "COMPLETED" && (
-                       <div className="flex items-center gap-1 text-green-600 font-bold px-4 bg-green-50 py-2 rounded-xl border border-green-100">
+                       <div className="flex items-center gap-1 text-green-600 font-bold px-4">
                            <CheckCircle size={18} /> Completed
                        </div>
                    )}
@@ -317,7 +246,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* --- TAB 2: SCHEDULE (SLOTS) --- */}
+        {/* 2. SCHEDULE & SLOTS TAB */}
         {activeTab === "SLOTS" && (
           <div className="grid lg:grid-cols-3 gap-8">
               {/* Calendar */}
@@ -377,7 +306,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* --- TAB 3: FINANCIALS --- */}
+        {/* 3. FINANCIALS TAB */}
         {activeTab === "FINANCIALS" && (
           <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -412,18 +341,19 @@ export default function DoctorDashboardClient({ specialist }: any) {
                     </div>
                  </div>
                  <div className="mt-6 flex gap-4">
-                    <button onClick={handleSaveBank} className="bg-black text-white px-6 py-3 rounded-xl font-bold">Save Bank Details</button>
+                    <button onClick={() => fetch("/api/doctor/bank", { method: "POST", body: JSON.stringify(bankForm) }).then(() => toast.success("Bank Saved"))} className="bg-black text-white px-6 py-3 rounded-xl font-bold">Save Bank Details</button>
                  </div>
               </div>
           </div>
         )}
 
-        {/* --- TAB 4: PROFILE SETTINGS --- */}
+        {/* 4. SETTINGS (PROFILE) TAB */}
         {activeTab === "PROFILE" && (
            <div className="bg-white p-8 rounded-3xl border border-gray-100 max-w-3xl">
               <h3 className="font-bold text-xl mb-6">Consultation Settings</h3>
               
               <div className="space-y-6">
+                 {/* Video Toggle */}
                  <div className="flex items-center justify-between p-4 border rounded-xl bg-purple-50 border-purple-100">
                     <div>
                         <h4 className="font-bold text-purple-900">Video Consultations</h4>
@@ -459,99 +389,73 @@ export default function DoctorDashboardClient({ specialist }: any) {
         )}
       </div>
 
-      {/* --- MODAL 1: SESSION MANAGER (Multi-Day Physio) --- */}
-      {sessionModalOpen && selectedBooking && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-           <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl relative animate-slide-up">
-              <button onClick={() => setSessionModalOpen(false)} className="absolute top-4 right-4"><X size={20}/></button>
-              <h3 className="font-bold text-xl mb-4">Manage Sessions</h3>
-              <p className="text-gray-500 text-sm mb-6">Patient: {selectedBooking.user.name}</p>
-              
-              <div className="space-y-3 mb-6 max-h-64 overflow-y-auto custom-scrollbar">
-                 {selectedBooking.dailyLogs?.map((log: any, index: number) => (
-                    <div key={log.id} className={`p-4 rounded-xl border flex justify-between items-center ${log.status === 'COMPLETED' ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
-                       <div>
-                          <p className="font-bold text-sm">Day {index + 1}</p>
-                          <p className="text-xs text-gray-500">{format(new Date(log.date), "dd MMM yyyy")}</p>
-                       </div>
-                       {log.status === 'COMPLETED' ? (
-                          <span className="text-green-600 font-bold text-xs flex items-center gap-1"><CheckCircle size={12}/> Done</span>
-                       ) : (
-                          <button onClick={() => markSessionDone(log.id)} className="text-xs bg-black text-white px-3 py-1.5 rounded-lg font-bold">Mark Done</button>
-                       )}
-                    </div>
-                 ))}
-              </div>
-
-              {/* Only show Payment Checkbox if specific session is being marked and payment type is PAY_ON_SERVICE */}
-              {selectedBooking.paymentType === 'PAY_ON_SERVICE' && (
-                 <div className="bg-yellow-50 p-4 rounded-xl mb-4 border border-yellow-100">
-                    <label className="flex items-center gap-3 font-bold text-sm text-yellow-900 cursor-pointer">
-                       <input type="checkbox" className="w-5 h-5 accent-black" onChange={(e) => setCashCollectedCheck(e.target.checked)} />
-                       Collect ₹{Math.round(currentSessionCost)} Cash for today?
-                    </label>
-                 </div>
-              )}
-
-              {/* If all logs are completed, offer Final Completion */}
-              {selectedBooking.dailyLogs?.every((l: any) => l.status === 'COMPLETED') && (
-                 <button onClick={() => { setSessionModalOpen(false); setCompleteModalOpen(true); }} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold animate-pulse">
-                    All Sessions Done &rarr; Create Final Report
-                 </button>
-              )}
-           </div>
-        </div>
-      )}
-
-      {/* --- MODAL 2: COMPLETE / PRESCRIPTION WRITER --- */}
+      {/* --- MODAL: COMPLETE APPOINTMENT --- */}
       {completeModalOpen && selectedBooking && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-           <div className="bg-white p-8 rounded-3xl w-full max-w-2xl h-[85vh] overflow-y-auto relative animate-slide-up">
-              <button onClick={() => setCompleteModalOpen(false)} className="absolute top-4 right-4"><X size={20}/></button>
-              <h3 className="font-bold text-2xl mb-6">Final Report & Prescription</h3>
+           <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl relative animate-slide-up">
+              <button onClick={() => setCompleteModalOpen(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full"><X size={20}/></button>
               
-              <div className="space-y-6">
+              <h3 className="font-bold text-2xl mb-1">Complete Appointment</h3>
+              <p className="text-gray-500 text-sm mb-6">Patient: {selectedBooking.user.name}</p>
+              
+              <div className="space-y-5">
+                 {/* UTR / Payment Check */}
+                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <p className="text-xs font-bold text-blue-600 uppercase mb-1">Payment Status</p>
+                    {selectedBooking.medicalCondition?.includes("UTR") ? (
+                        <p className="font-mono font-bold text-lg">{selectedBooking.medicalCondition}</p>
+                    ) : (
+                        <p className="font-bold text-gray-900">{selectedBooking.paymentType === 'ONLINE_ADVANCE' ? 'Paid Online' : 'Pay at Clinic'}</p>
+                    )}
+                 </div>
+
+                 {/* Prescription Writer */}
                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Diagnosis / Problem</label>
-                    <input className="w-full p-3 border rounded-xl font-bold focus:ring-2 focus:ring-black outline-none" placeholder="e.g. Acute Back Pain" onChange={e => setRxForm({...rxForm, diagnosis: e.target.value})} />
+                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <FileText size={16} /> Prescription & Notes
+                    </label>
+                    <textarea 
+                        className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none min-h-[120px] text-sm"
+                        placeholder="Write diagnosis, medicines (e.g. Paracetamol 500mg - 2x daily), and advice here..."
+                        value={prescription}
+                        onChange={(e) => setPrescription(e.target.value)}
+                    />
                  </div>
 
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Clinical Advice</label>
-                    <textarea className="w-full p-3 border rounded-xl h-24 focus:ring-2 focus:ring-black outline-none" placeholder="e.g. Rest for 3 days, apply ice pack..." onChange={e => setRxForm({...rxForm, advice: e.target.value})} />
-                 </div>
+                 {/* OTP Check (Only for Clinic) */}
+                 {selectedBooking.locationType !== 'VIDEO' && (
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Verify Patient Code</label>
+                        <div className="flex gap-4 items-center">
+                            <div className="bg-gray-100 px-4 py-2 rounded-lg font-mono font-bold text-gray-500 tracking-widest">{generatedOtp}</div>
+                            <input 
+                                className="flex-1 p-3 border-2 rounded-xl text-center font-bold tracking-widest outline-none focus:border-black"
+                                placeholder="Enter Code"
+                                maxLength={4}
+                                value={otpInput}
+                                onChange={(e) => setOtpInput(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                 )}
 
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Medicines / Exercises</label>
-                    <textarea className="w-full p-3 border rounded-xl h-24 focus:ring-2 focus:ring-black outline-none" placeholder="- Paracetamol 500mg (2x daily)&#10;- Stretch exercises" onChange={e => setRxForm({...rxForm, medicines: e.target.value})} />
-                 </div>
-
-                 {/* Upload */}
-                 <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors">
-                    <UploadCloud className="mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-500 mb-2">Upload handwritten prescription (Optional)</p>
-                    <input type="file" accept="application/pdf, image/*" onChange={handleUpload} className="text-sm mx-auto w-fit" />
-                    {isUploading && <p className="text-xs text-blue-600 mt-2 animate-pulse">Uploading...</p>}
-                    {uploadedRxUrl && <p className="text-xs text-green-600 mt-2 font-bold flex items-center justify-center gap-1"><CheckCircle size={12}/> File Attached</p>}
-                 </div>
-
-                 {/* Cash Check (Single Session Logic) */}
-                 {selectedBooking.duration === 1 && selectedBooking.paymentType === 'PAY_ON_SERVICE' && (
-                    <label className="flex items-center gap-3 p-4 border rounded-xl bg-yellow-50 border-yellow-100 cursor-pointer">
+                 {/* Cash Check */}
+                 {selectedBooking.paymentType === 'PAY_ON_SERVICE' && (
+                    <label className="flex items-center gap-3 p-4 border rounded-xl cursor-pointer bg-yellow-50 border-yellow-100">
                         <input type="checkbox" className="w-5 h-5 accent-black" onChange={(e) => setCashCollectedCheck(e.target.checked)} />
-                        <span className="font-bold text-sm text-yellow-900">Confirm Cash Payment of ₹{selectedBooking.totalPrice}</span>
+                        <span className="font-bold text-sm text-yellow-900">I confirm receipt of ₹{selectedBooking.totalPrice}</span>
                     </label>
                  )}
 
-                 <button onClick={completeBooking} className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:scale-[1.01] transition-transform">
-                    Generate & Complete
+                 <button onClick={verifyOtpAndComplete} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-green-700 transition-all shadow-lg shadow-green-200">
+                    Submit & Complete
                  </button>
               </div>
            </div>
         </div>
       )}
 
-      {/* --- MODAL 3: VIEW DETAILS --- */}
+      {/* --- MODAL: VIEW DETAILS --- */}
       {detailsModalOpen && selectedBooking && (
          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
             <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto relative p-8 animate-slide-up">

@@ -10,7 +10,10 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
   const { data: session } = useSession();
   const router = useRouter();
   const roomID = params.roomId;
+  
+  // Refs
   const zpRef = useRef<any>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
 
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 Mins Countdown
   const [isJoined, setIsJoined] = useState(false);
@@ -32,15 +35,18 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
 
   // 2. ZEGO INITIALIZATION
   useEffect(() => {
-    const initVideo = async () => {
-      if (!session?.user) return;
+    let zpInstance: any = null;
 
+    const initVideo = async () => {
+      if (!session?.user || !videoContainerRef.current) return;
+
+      // Dynamic import to avoid SSR issues
       const { ZegoUIKitPrebuilt } = await import("@zegocloud/zego-uikit-prebuilt");
 
       const appID = 2076410495; 
       const serverSecret = "56fdfab53961f61f87096fddffaafc22";
 
-      // ⚠️ CRITICAL FIX: Zego requires UserID and RoomID to be STRINGS
+      // Generate Token
       const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
         appID,
         serverSecret,
@@ -49,22 +55,25 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
         session.user.name || "User"
       );
 
-      const zp = ZegoUIKitPrebuilt.create(kitToken);
-      zpRef.current = zp;
+      // Create Instance
+      zpInstance = ZegoUIKitPrebuilt.create(kitToken);
+      zpRef.current = zpInstance;
 
-      zp.joinRoom({
-        container: document.getElementById("video-container"),
+      // Join Room
+      zpInstance.joinRoom({
+        container: videoContainerRef.current,
         sharedLinks: [
           { name: 'Copy Link', url: window.location.href }
         ],
         scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
         showScreenSharingButton: true,
-        showLeavingView: false, 
+        showLeavingView: false, // We handle leaving manually
         onJoinRoom: () => {
            setIsJoined(true);
            toast.success("Connected! Timer started.");
         },
         onLeaveRoom: () => {
+           // Just navigate away. The useEffect cleanup will handle destruction.
            router.push('/dashboard/user');
         }
       });
@@ -72,18 +81,28 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
 
     if (session) initVideo();
 
+    // CLEANUP: This runs ONLY when component unmounts
     return () => {
-      if (zpRef.current) zpRef.current.destroy();
+      if (zpRef.current) {
+        try {
+            zpRef.current.destroy();
+        } catch (error) {
+            console.warn("Zego cleanup warning:", error);
+        }
+        zpRef.current = null;
+      }
     };
-  }, [session, roomID]);
+  }, [session, roomID, router]);
 
-  // 3. DISCONNECT LOGIC
+  // 3. HANDLERS
   const handleAutoDisconnect = () => {
     toast("Time's up! Session ending...", { icon: '⌛' });
-    if(zpRef.current) {
-        zpRef.current.destroy();
-    }
     router.push("/dashboard/user");
+  };
+
+  const handleManualDisconnect = () => {
+    // Only navigate. Do NOT call destroy() here.
+    router.push('/dashboard/user');
   };
 
   const formatTime = (s: number) => {
@@ -107,14 +126,14 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
 
       {/* OVERLAY: End Button */}
       <button 
-        onClick={() => { zpRef.current?.destroy(); router.push('/dashboard/user'); }}
+        onClick={handleManualDisconnect}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110"
       >
         <PhoneOff size={24} />
       </button>
 
       {/* VIDEO CONTAINER */}
-      <div id="video-container" className="w-full h-full" />
+      <div ref={videoContainerRef} className="w-full h-full" />
     </div>
   );
 }
