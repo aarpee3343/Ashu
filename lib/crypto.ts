@@ -11,21 +11,31 @@ const IV_LENGTH = 16;
 // Buffer-level helpers (already correct)
 // ───────────────────────────────────────────────
 
-export function encryptBuffer(buffer: Buffer): Buffer {
+export function encryptBuffer(buffer: Buffer | Uint8Array): Buffer {
   if (Buffer.from(SECRET_KEY).length !== 32) {
     throw new Error("ENCRYPTION_KEY must be exactly 32 characters long");
   }
 
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(SECRET_KEY), iv);
+  const cipher = crypto.createCipheriv(
+    ALGORITHM,
+    Buffer.from(SECRET_KEY),
+    iv
+  );
 
-  const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(Buffer.from(buffer)),
+    cipher.final(),
+  ]);
+
   return Buffer.concat([iv, encrypted]);
 }
 
-export function decryptBuffer(encryptedBuffer: Buffer): Buffer {
-  const iv = encryptedBuffer.subarray(0, IV_LENGTH);
-  const encryptedData = encryptedBuffer.subarray(IV_LENGTH);
+export function decryptBuffer(buffer: Buffer | Uint8Array): Buffer {
+  const data = Buffer.from(buffer);
+
+  const iv = data.subarray(0, IV_LENGTH);
+  const encryptedData = data.subarray(IV_LENGTH);
 
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
@@ -38,6 +48,7 @@ export function decryptBuffer(encryptedBuffer: Buffer): Buffer {
     decipher.final(),
   ]);
 }
+
 
 // ───────────────────────────────────────────────
 // ✅ FILE-LEVEL helper (THIS WAS MISSING)
