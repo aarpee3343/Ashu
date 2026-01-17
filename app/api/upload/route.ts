@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer as ArrayBuffer);
 
-    let finalBuffer = buffer;
+    let finalBuffer: Uint8Array = buffer;
     let finalFilename = filename;
 
     // 4. Encryption Logic
