@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { format, addHours, isBefore, parse } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import AsyncButton from "@/components/ui/AsyncButton";
 import { MapPin, Home, Video, Building2, Clock } from "lucide-react";
 
 export default function BookingPaymentModal({ 
@@ -77,8 +78,8 @@ export default function BookingPaymentModal({
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">🔒</div>
           <h3 className="text-xl font-bold mb-2">Login Required</h3>
           <p className="text-gray-500 mb-6">Please login to confirm your booking.</p>
-          <button onClick={() => signIn()} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">Login</button>
-          <button onClick={onClose} className="mt-4 text-sm text-gray-500 hover:text-gray-900">Cancel</button>
+          <AsyncButton onClick={() => signIn()} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">Login</AsyncButton>
+          <AsyncButton onClick={onClose} className="mt-4 text-sm text-gray-500 hover:text-gray-900">Cancel</AsyncButton>
         </div>
       </div>
     );
@@ -165,7 +166,7 @@ export default function BookingPaymentModal({
           <h3 className="font-bold text-lg">
             {step === 1 ? "Booking Details" : "Review & Pay"}
           </h3>
-          <button onClick={onClose} className="p-1 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors">✕</button>
+          <AsyncButton onClick={onClose} className="p-1 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors">✕</AsyncButton>
         </div>
 
         <div className="p-6 overflow-y-auto custom-scrollbar">
@@ -197,25 +198,25 @@ export default function BookingPaymentModal({
                {/* --- LOCATION TOGGLE --- */}
                {initialMode !== "VIDEO" ? (
                  <div className="grid grid-cols-3 bg-gray-100 p-1 rounded-xl">
-                     <button 
+                     <AsyncButton 
                        onClick={() => { setLocationType("CLINIC"); setDuration(1); }}
                        className={`py-2 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${locationType === "CLINIC" ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
                      >
                        <Building2 size={16} /> Clinic
-                     </button>
-                     <button 
+                     </AsyncButton>
+                     <AsyncButton 
                        onClick={() => { setLocationType("HOME"); setDuration(1); }}
                        className={`py-2 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${locationType === "HOME" ? "bg-white shadow text-green-600" : "text-gray-500 hover:text-gray-700"}`}
                      >
                        <Home size={16} /> Home
-                     </button>
+                     </butAsyncButtonton>
                      {specialist.isVideoAvailable && (
-                       <button 
+                       <AsyncButton 
                          onClick={() => { setLocationType("VIDEO"); setDuration(15); }}
                          className={`py-2 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${locationType === "VIDEO" ? "bg-white shadow text-purple-600" : "text-gray-500 hover:text-gray-700"}`}
                        >
                          <Video size={16} /> Video
-                       </button>
+                       </AsyncButton>
                      )}
                  </div>
                ) : (
@@ -232,7 +233,7 @@ export default function BookingPaymentModal({
                     <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">Select Duration</label>
                     <div className="grid grid-cols-4 gap-2">
                        {[15, 30, 45, 60].map((mins) => (
-                          <button key={mins} onClick={() => setDuration(mins)} className={`py-2 rounded-lg text-sm font-bold border transition-all ${duration === mins ? "bg-purple-600 text-white border-purple-600 shadow-md" : "bg-white text-gray-600 hover:border-purple-300"}`}>{mins}m</button>
+                          <AsyncButton key={mins} onClick={() => setDuration(mins)} className={`py-2 rounded-lg text-sm font-bold border transition-all ${duration === mins ? "bg-purple-600 text-white border-purple-600 shadow-md" : "bg-white text-gray-600 hover:border-purple-300"}`}>{mins}m</AsyncButton>
                        ))}
                     </div>
                   </div>
@@ -243,12 +244,12 @@ export default function BookingPaymentModal({
                   <div className="animate-fade-in bg-gray-50 p-4 rounded-xl border border-gray-100">
                     <label className="block text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Number of 1-Hour Sessions</label>
                     <div className="flex items-center justify-between">
-                       <button onClick={() => setDuration(Math.max(1, duration - 1))} className="w-10 h-10 rounded-full bg-white border border-gray-200 font-bold hover:bg-gray-100 text-lg shadow-sm">-</button>
+                       <AsyncButton onClick={() => setDuration(Math.max(1, duration - 1))} className="w-10 h-10 rounded-full bg-white border border-gray-200 font-bold hover:bg-gray-100 text-lg shadow-sm">-</AsyncButton>
                        <div className="text-center">
                           <span className="block font-bold text-2xl text-gray-900">{duration}</span>
                           <span className="text-xs text-gray-500">Session{duration > 1 ? 's' : ''}</span>
                        </div>
-                       <button onClick={() => setDuration(duration + 1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 font-bold hover:bg-gray-100 text-lg shadow-sm">+</button>
+                       <AsyncButton onClick={() => setDuration(duration + 1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 font-bold hover:bg-gray-100 text-lg shadow-sm">+</AsyncButton>
                     </div>
                   </div>
                )}
@@ -340,9 +341,9 @@ export default function BookingPaymentModal({
               {paymentMode === "ONLINE" && (
                 <div className="ml-8 grid grid-cols-3 gap-2">
                   {[25, 50, 100].map((pct) => (
-                    <button key={pct} onClick={() => setAdvancePercent(pct)} className={`py-2 text-xs font-bold rounded border ${advancePercent === pct ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600"}`}>
+                    <AsyncButton key={pct} onClick={() => setAdvancePercent(pct)} className={`py-2 text-xs font-bold rounded border ${advancePercent === pct ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600"}`}>
                       {pct}% (₹{Math.round((finalPrice * pct) / 100)})
-                    </button>
+                    </AsyncButton>
                   ))}
                 </div>
               )}
@@ -359,27 +360,27 @@ export default function BookingPaymentModal({
 
         <div className="p-4 border-t bg-gray-50 flex gap-3 sticky bottom-0 z-10 bg-white">
           {step === 2 ? (
-             <button onClick={() => setStep(1)} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Back</button>
+             <AsyncButton onClick={() => setStep(1)} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Back</button>
           ) : (
-             <button onClick={onClose} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Cancel</button>
+             <AsyncButton onClick={onClose} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Cancel</button>
           )}
 
           {step === 1 ? (
-             <button 
+             <AsyncButton 
                onClick={() => setStep(2)} 
                disabled={(locationType === 'CLINIC' && !selectedClinicId) || (locationType === 'HOME' && !homeAddress)}
                className="flex-[2] bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200 transition-all"
              >
                Proceed to Payment
-             </button>
+             </AsyncButton>
           ) : (
-            <button 
+            <AsyncButton 
               onClick={handleConfirmBooking} 
               disabled={isProcessing}
               className="flex-[2] bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 shadow-lg shadow-green-200 disabled:opacity-70 transition-all"
             >
               {isProcessing ? "Processing..." : `Confirm (₹${finalPrice})`}
-            </button>
+            </AsyncButton>
           )}
         </div>
       </div>

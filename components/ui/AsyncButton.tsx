@@ -4,7 +4,8 @@ import { useGlobalLoader } from "@/context/GlobalLoader";
 import { useState } from "react";
 
 interface AsyncButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => Promise<void> | void;
+  // ✅ FIX: Changed return type from 'void' to 'any' to accept toast/signIn returns
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => Promise<any> | any;
   children: React.ReactNode;
 }
 
@@ -13,7 +14,7 @@ export default function AsyncButton({ onClick, children, className, ...props }: 
   const [localLoading, setLocalLoading] = useState(false);
 
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    // If there is no onClick provided, act like a normal button
+    // If no onClick is passed, just behave like a normal button
     if (!onClick) return;
 
     // Start Loaders
@@ -21,10 +22,10 @@ export default function AsyncButton({ onClick, children, className, ...props }: 
     setLocalLoading(true);
 
     try {
-      // Wait for the action to finish
+      // We await the function regardless of what it returns
       await onClick(e);
     } catch (error) {
-      console.error(error);
+      console.error("AsyncButton Error:", error);
     } finally {
       // Stop Loaders
       setLoading(false);
@@ -39,7 +40,7 @@ export default function AsyncButton({ onClick, children, className, ...props }: 
       disabled={localLoading || props.disabled}
       className={`${className} ${localLoading ? "opacity-70 cursor-not-allowed" : ""}`}
     >
-      {localLoading ? "Please wait..." : children}
+      {localLoading ? "Reviving..." : children}
     </button>
   );
 }

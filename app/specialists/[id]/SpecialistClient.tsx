@@ -6,6 +6,7 @@ import BookingWizard from "@/components/BookingWizard";
 import { MapPin, Video, Home, Star, ShieldCheck, X, LogIn, ChevronRight, GraduationCap, Award, Languages, Building2, ThumbsUp } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import AsyncButton from "@/components/ui/AsyncButton";
 import { usePathname } from "next/navigation";
 
 export default function SpecialistClient({ specialist, initialMode = "CLINIC" }: any) {
@@ -100,9 +101,9 @@ export default function SpecialistClient({ specialist, initialMode = "CLINIC" }:
                   {specialist.bio}
                </div>
                {specialist.bio && specialist.bio.length > 200 && (
-                  <button onClick={() => setShowFullBio(!showFullBio)} className="text-blue-600 font-bold text-sm mt-2 underline">
+                  <AsyncButton onClick={() => setShowFullBio(!showFullBio)} className="text-blue-600 font-bold text-sm mt-2 underline">
                      {showFullBio ? "Read Less" : "Read More"}
-                  </button>
+                  </AsyncButton>
                )}
             </div>
 
@@ -208,10 +209,10 @@ export default function SpecialistClient({ specialist, initialMode = "CLINIC" }:
                {/* Mode Switcher */}
                <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
                   {[{ id: "CLINIC", label: "Clinic", icon: MapPin }, { id: "VIDEO", label: "Video", icon: Video }, { id: "HOME", label: "Home", icon: Home }].map((m) => (
-                     <button key={m.id} onClick={() => setActiveTab(m.id)} className={`flex-1 flex flex-col items-center py-2 rounded-lg transition-all ${activeTab === m.id ? "bg-white shadow text-black font-bold" : "text-gray-400 hover:text-gray-600"}`}>
+                     <AsyncButton key={m.id} onClick={() => setActiveTab(m.id)} className={`flex-1 flex flex-col items-center py-2 rounded-lg transition-all ${activeTab === m.id ? "bg-white shadow text-black font-bold" : "text-gray-400 hover:text-gray-600"}`}>
                         <m.icon size={16} className="mb-1" />
                         <span className="text-[10px] uppercase">{m.label}</span>
-                     </button>
+                     </AsyncButton>
                   ))}
                </div>
 
@@ -226,12 +227,12 @@ export default function SpecialistClient({ specialist, initialMode = "CLINIC" }:
                   {activeTab === 'VIDEO' && <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">Available Today</span>}
                </div>
 
-               <button 
+               <AsyncButton 
                   onClick={handleBookClick}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-200 transition-transform active:scale-95 flex items-center justify-center gap-2"
                >
                   Book Slot <ChevronRight size={20} />
-               </button>
+               </AsyncButton>
 
                <div className="mt-4 text-center">
                   <p className="text-[10px] text-gray-400 flex items-center justify-center gap-1">
@@ -258,7 +259,7 @@ export default function SpecialistClient({ specialist, initialMode = "CLINIC" }:
       {showLoginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
            <div className="bg-white w-full max-w-sm rounded-3xl p-6 relative shadow-2xl animate-slide-up">
-              <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></button>
+              <AsyncButton onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></AsyncButton>
               <div className="flex flex-col items-center text-center">
                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 text-2xl"><LogIn /></div>
                  <h3 className="font-bold text-xl mb-2">Login Required</h3>

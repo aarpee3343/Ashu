@@ -2,6 +2,7 @@ import SpecialistCard from "@/components/SpecialistCard";
 import SkeletonCard from "@/components/SkeletonCard";
 import { getSpecialists } from "@/lib/getSpecialists";
 import Link from "next/link";
+import AsyncButton from "@/components/ui/AsyncButton";
 import Footer from "@/components/Footer";
 
 export default async function Home() {
@@ -48,9 +49,9 @@ export default async function Home() {
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none text-gray-900 font-medium transition-all"
               />
             </div>
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-blue-200">
+            <AsyncButton type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-blue-200">
               Search
-            </button>
+            </AsyncButton>
           </form>
         </div>
       </section>

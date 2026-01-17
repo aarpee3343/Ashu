@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import AsyncButton from "@/components/ui/AsyncButton";
 import Link from "next/link";
 import { 
   Video, MapPin, Clock, CreditCard, FileText, CheckCircle, X, 
@@ -419,12 +420,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
              { id: "FINANCIALS", label: "Earnings" },
              { id: "PROFILE", label: "Settings" }
            ].map(tab => (
-             <button key={tab.id} onClick={() => changeTab(tab.id)} 
+             <AsyncButton key={tab.id} onClick={() => changeTab(tab.id)} 
                className={`px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all ${activeTab === tab.id ? "bg-black text-white shadow-lg" : "bg-white text-gray-500 hover:bg-gray-100"}`}>
                {tab.label}
-             </button>
+             </AsyncButton>
            ))}
-           <button onClick={() => signOut()} className="ml-auto text-red-600 font-bold text-sm px-4 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">Log Out</button>
+           <AsyncButton onClick={() => signOut()} className="ml-auto text-red-600 font-bold text-sm px-4 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">Log Out</AsyncButton>
         </div>
 
         {/* --- TAB 1: APPOINTMENTS --- */}
@@ -466,9 +467,9 @@ export default function DoctorDashboardClient({ specialist }: any) {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 items-center justify-center pl-4">
-                   <button onClick={() => { setSelectedBooking(b); setDetailsModalOpen(true); }} className="w-full sm:w-auto px-5 py-2.5 border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors">
+                   <AsyncButton onClick={() => { setSelectedBooking(b); setDetailsModalOpen(true); }} className="w-full sm:w-auto px-5 py-2.5 border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors">
                       Details
-                   </button>
+                   </AsyncButton>
                    
                    {b.status === "UPCOMING" && (
                       <>
@@ -483,12 +484,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
                         )}
                         
                         {/* SMART ACTION BUTTON */}
-                        <button 
+                        <AsyncButton 
                             onClick={() => openActionModal(b)} 
                             className="w-full sm:w-auto bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
                         >
                            {b.duration > 1 ? "Manage Sessions" : "Complete"}
-                        </button>
+                        </AsyncButton>
                       </>
                    )}
                    {b.status === "COMPLETED" && (
@@ -508,9 +509,9 @@ export default function DoctorDashboardClient({ specialist }: any) {
               {/* Calendar */}
               <div className="bg-white p-6 rounded-3xl border border-gray-100 h-fit">
                  <div className="flex justify-between mb-6 font-bold text-lg">
-                    <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="hover:bg-gray-100 p-2 rounded-lg">←</button>
+                    <AsyncButton onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="hover:bg-gray-100 p-2 rounded-lg">←</AsyncButton>
                     <span>{format(currentDate, "MMMM yyyy")}</span>
-                    <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="hover:bg-gray-100 p-2 rounded-lg">→</button>
+                    <AsyncButton onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="hover:bg-gray-100 p-2 rounded-lg">→</AsyncButton>
                  </div>
                  <div className="grid grid-cols-7 gap-2 text-center mb-2">
                     {['S','M','T','W','T','F','S'].map((d, i) => (
@@ -527,10 +528,10 @@ export default function DoctorDashboardClient({ specialist }: any) {
                       const isSelected = isSameDay(day, selectedSlotDate);
                       const hasBooking = specialist.bookings.some((b: any) => isSameDay(new Date(b.date), day) && b.status !== 'CANCELLED');
                       return (
-                        <button key={day.toString()} onClick={() => setSelectedSlotDate(day)} 
+                        <AsyncButton key={day.toString()} onClick={() => setSelectedSlotDate(day)} 
                             className={`p-2 rounded-xl text-sm font-medium transition-all ${isSelected ? "bg-black text-white shadow-md" : "hover:bg-gray-50"} ${hasBooking ? "ring-2 ring-red-100 text-red-600" : ""}`}>
                           {format(day, "d")}
-                        </button>
+                        </AsyncButton>
                       )
                     })}
                  </div>
@@ -541,8 +542,8 @@ export default function DoctorDashboardClient({ specialist }: any) {
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-xl">Availability for {format(selectedSlotDate, "dd MMM")}</h3>
                     <div className="flex gap-2">
-                       <button onClick={() => handleBulkSlotAction("OPEN")} className="text-green-700 bg-green-50 text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-100">Mark Available</button>
-                       <button onClick={() => handleBulkSlotAction("BLOCK")} className="text-red-700 bg-red-50 text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-100">Mark Busy</button>
+                       <AsyncButton onClick={() => handleBulkSlotAction("OPEN")} className="text-green-700 bg-green-50 text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-100">Mark Available</AsyncButton>
+                       <AsyncButton onClick={() => handleBulkSlotAction("BLOCK")} className="text-red-700 bg-red-50 text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-100">Mark Busy</AsyncButton>
                     </div>
                  </div>
                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
@@ -557,11 +558,11 @@ export default function DoctorDashboardClient({ specialist }: any) {
                        if (isSelected) bgClass = "bg-blue-50 border-blue-500 text-blue-700 ring-1 ring-blue-500";
 
                        return (
-                         <button key={time} onClick={() => !isBooked && toggleSlotSelection(time)} disabled={isBooked} 
+                         <AsyncButton key={time} onClick={() => !isBooked && toggleSlotSelection(time)} disabled={isBooked} 
                             className={`p-4 rounded-xl border-2 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all ${bgClass}`}>
                             {time}
                             <span className="text-[9px] uppercase font-extrabold opacity-70">{isBooked ? "Booked" : isBlocked ? "Blocked" : "Open"}</span>
-                         </button>
+                         </AsyncButton>
                        )
                     })}
                  </div>
@@ -589,13 +590,13 @@ export default function DoctorDashboardClient({ specialist }: any) {
                     <p className="text-xs text-gray-400 uppercase font-bold mb-1">Payout Pending</p>
                     <div className="flex justify-between items-center">
                       <p className="font-bold text-2xl text-green-400">₹{payoutEligibleAmount}</p>
-                      <button 
+                      <AsyncButton 
                         onClick={handleRequestPayout} 
                         disabled={payoutEligibleAmount < 500}
                         className={`text-xs px-3 py-1 rounded-lg font-bold transition-colors ${payoutEligibleAmount >= 500 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-700 text-gray-300 cursor-not-allowed'}`}
                       >
                         <Wallet size={12} className="inline mr-1" /> Withdraw
-                      </button>
+                      </AsyncButton>
                     </div>
                     {payoutEligibleAmount < 500 && (
                       <p className="text-xs text-gray-300 mt-2">Minimum ₹500 required</p>
@@ -616,7 +617,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
                     </div>
                  </div>
                  <div className="mt-6 flex gap-4">
-                    <button onClick={handleSaveBank} className="bg-black text-white px-6 py-3 rounded-xl font-bold">Save Bank Details</button>
+                    <AsyncButton onClick={handleSaveBank} className="bg-black text-white px-6 py-3 rounded-xl font-bold">Save Bank Details</AsyncButton>
                  </div>
               </div>
           </div>
@@ -669,12 +670,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
               <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-xl">My Clinics</h3>
-                    <button 
+                    <AsyncButton 
                       onClick={() => setClinicModalOpen(true)} 
                       className="text-xs bg-black text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-gray-800 transition-colors"
                     >
                       <Plus size={12}/> Add Clinic
-                    </button>
+                    </AsyncButton>
                  </div>
                  
                  <div className="space-y-3">
@@ -705,12 +706,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
               <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-xl">Education</h3>
-                    <button 
+                    <AsyncButton 
                       onClick={() => addListItem("educations", { degree: "", college: "", year: "" })} 
                       className="text-xs bg-black text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-gray-800 transition-colors"
                     >
                       <Plus size={12}/> Add
-                    </button>
+                    </AsyncButton>
                  </div>
                  
                  {profileForm.educations.length === 0 ? (
@@ -737,12 +738,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
                            value={edu.year} 
                            onChange={e => updateList("educations", i, "year", e.target.value)} 
                          />
-                         <button 
+                         <AsyncButton 
                            onClick={() => removeListItem("educations", i)} 
                            className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                          >
                            <Trash2 size={18}/>
-                         </button>
+                         </AsyncButton>
                        </div>
                      ))}
                    </div>
@@ -753,12 +754,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
               <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-xl">Awards & Recognitions</h3>
-                    <button 
+                    <AsyncButton 
                       onClick={() => addListItem("awards", { name: "", year: "" })} 
                       className="text-xs bg-black text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-gray-800 transition-colors"
                     >
                       <Plus size={12}/> Add
-                    </button>
+                    </AsyncButton>
                  </div>
                  
                  {profileForm.awards.length === 0 ? (
@@ -779,12 +780,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
                            value={award.year} 
                            onChange={e => updateList("awards", i, "year", e.target.value)} 
                          />
-                         <button 
+                         <AsyncButton 
                            onClick={() => removeListItem("awards", i)} 
                            className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                          >
                            <Trash2 size={18}/>
-                         </button>
+                         </AsyncButton>
                        </div>
                      ))}
                    </div>
@@ -793,12 +794,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
 
               {/* Save Button */}
               <div className="sticky bottom-4 bg-white p-4 rounded-2xl shadow-xl">
-                 <button 
+                 <AsyncButton 
                    onClick={handleUpdateProfile} 
                    className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-900 transition-colors shadow-lg"
                  >
                     Save All Changes
-                 </button>
+                 </AsyncButton>
               </div>
            </div>
         )}
@@ -808,9 +809,9 @@ export default function DoctorDashboardClient({ specialist }: any) {
       {clinicModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
            <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-slide-up">
-              <button onClick={() => setClinicModalOpen(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full">
+              <AsyncButton onClick={() => setClinicModalOpen(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full">
                 <X size={20} className="text-gray-600" />
-              </button>
+              </AsyncButton>
               
               <div className="flex items-center gap-3 mb-6">
                 <div className="bg-blue-100 p-2 rounded-lg">
@@ -865,19 +866,19 @@ export default function DoctorDashboardClient({ specialist }: any) {
                  </div>
                  
                  <div className="pt-4">
-                   <button 
+                   <AsyncButton 
                      onClick={handleAddClinic} 
                      className="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-gray-900 transition-colors flex items-center justify-center gap-2"
                    >
                      <Building2 size={18} />
                      Add Clinic Location
-                   </button>
-                   <button 
+                   </AsyncButton>
+                   <AsyncButton 
                      onClick={() => setClinicModalOpen(false)} 
                      className="w-full text-center py-3 text-gray-500 hover:text-gray-700 transition-colors"
                    >
                      Cancel
-                   </button>
+                   </AsyncButton>
                  </div>
               </div>
            </div>
@@ -888,7 +889,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
       {sessionModalOpen && selectedBooking && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
            <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl relative animate-slide-up">
-              <button onClick={() => setSessionModalOpen(false)} className="absolute top-4 right-4"><X size={20}/></button>
+              <AsyncButton onClick={() => setSessionModalOpen(false)} className="absolute top-4 right-4"><X size={20}/></AsyncButton>
               <h3 className="font-bold text-xl mb-4">Manage Sessions</h3>
               <p className="text-gray-500 text-sm mb-6">Patient: {selectedBooking.user.name}</p>
               
@@ -923,7 +924,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
                        {log.status === 'COMPLETED' ? (
                           <span className="text-green-600 font-bold text-xs flex items-center gap-1"><CheckCircle size={12}/> Done</span>
                        ) : (
-                          <button onClick={() => markSessionDone(log.id)} className="text-xs bg-black text-white px-3 py-1.5 rounded-lg font-bold">Mark Done</button>
+                          <AsyncButton onClick={() => markSessionDone(log.id)} className="text-xs bg-black text-white px-3 py-1.5 rounded-lg font-bold">Mark Done</AsyncButton>
                        )}
                     </div>
                  ))}
@@ -948,9 +949,9 @@ export default function DoctorDashboardClient({ specialist }: any) {
 
               {/* If all logs are completed, offer Final Completion */}
               {selectedBooking.dailyLogs?.every((l: any) => l.status === 'COMPLETED') && (
-                 <button onClick={() => { setSessionModalOpen(false); setCompleteModalOpen(true); }} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold animate-pulse">
+                 <AsyncButton onClick={() => { setSessionModalOpen(false); setCompleteModalOpen(true); }} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold animate-pulse">
                     All Sessions Done &rarr; Create Final Report
-                 </button>
+                 </AsyncButton>
               )}
            </div>
         </div>
@@ -967,12 +968,12 @@ export default function DoctorDashboardClient({ specialist }: any) {
                      <h3 className="font-bold text-2xl text-gray-800">Prescription</h3>
                      <p className="text-sm text-gray-500">Generate official prescription for {selectedBooking.user?.name}</p>
                   </div>
-                  <button 
+                  <AsyncButton 
                      onClick={() => setCompleteModalOpen(false)} 
                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
                      <X size={24} className="text-gray-600"/>
-                  </button>
+                  </AsyncButton>
                </div>
                
                {/* Scrollable Form Area */}
@@ -1054,13 +1055,13 @@ export default function DoctorDashboardClient({ specialist }: any) {
 
                {/* Footer Action */}
                <div className="pt-4 border-t mt-4">
-                  <button 
+                  <AsyncButton 
                      onClick={completeBooking} 
                      className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-900 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform active:scale-[0.99]"
                   >
                      <FileText size={20} />
                      Generate Prescription & Complete
-                  </button>
+                  </AsyncButton>
                </div>
          </div>
       </div>
@@ -1070,7 +1071,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
       {detailsModalOpen && selectedBooking && (
          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
             <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto relative p-8 animate-slide-up">
-               <button onClick={() => setDetailsModalOpen(false)} className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={20}/></button>
+               <AsyncButton onClick={() => setDetailsModalOpen(false)} className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={20}/></AsyncButton>
                
                <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">

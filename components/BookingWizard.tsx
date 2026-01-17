@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import AsyncButton from "@/components/ui/AsyncButton";
 import { format, addDays, isSameDay } from "date-fns";
 import {
   X,
@@ -223,9 +224,9 @@ export default function BookingWizard({
         {/* HEADER */}
         <div className="p-5 border-b flex items-center justify-between">
           {step > 1 ? (
-            <button onClick={() => setStep(step - 1)}>
+            <AsyncButton onClick={() => setStep(step - 1)}>
               <ChevronLeft />
-            </button>
+            </AsyncButton>
           ) : (
             <div className="w-6" />
           )}
@@ -234,9 +235,9 @@ export default function BookingWizard({
             {step === 2 && "Patient Details"}
             {step === 3 && "Payment"}
           </h3>
-          <button onClick={onClose}>
+          <AsyncButton onClick={onClose}>
             <X />
-          </button>
+          </AsyncButton>
         </div>
 
         {/* CONTENT */}
@@ -246,7 +247,7 @@ export default function BookingWizard({
             <>
               {mode === "CLINIC" &&
                 specialist.clinics?.map((c: any) => (
-                  <button
+                  <AsyncButton
                     key={c.id}
                     onClick={() => setSelectedClinicId(c.id)}
                     className={`w-full p-4 rounded-xl border flex gap-3 ${
@@ -260,13 +261,13 @@ export default function BookingWizard({
                       <p className="font-bold">{c.name}</p>
                       <p className="text-xs text-gray-500">{c.city}</p>
                     </div>
-                  </button>
+                  </AsyncButton>
                 ))}
 
               {/* Date */}
               <div className="flex gap-3 overflow-x-auto">
                 {dateStrip.map((d) => (
-                  <button
+                  <AsyncButton
                     key={d.toString()}
                     onClick={() => {
                       setSelectedDate(d);
@@ -280,7 +281,7 @@ export default function BookingWizard({
                   >
                     <div className="text-xs">{format(d, "EEE")}</div>
                     <div className="text-lg">{format(d, "d")}</div>
-                  </button>
+                  </AsyncButton>
                 ))}
               </div>
 
@@ -289,7 +290,7 @@ export default function BookingWizard({
                 {allSlots.map((slot) => {
                   const isBusy = busySlots.includes(slot);
                   return (
-                    <button
+                    <AsyncButton
                       key={slot}
                       disabled={isBusy}
                       onClick={() => !isBusy && setSelectedSlot(slot)}
@@ -302,7 +303,7 @@ export default function BookingWizard({
                       }`}
                     >
                       {slot}
-                    </button>
+                    </AsyncButton>
                   );
                 })}
               </div>
@@ -356,15 +357,15 @@ export default function BookingWizard({
               <h1 className="text-3xl font-bold text-center">₹{totalPrice}</h1>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
+                <AsyncButton
                   onClick={() => setPaymentMethod("ONLINE")}
                   className={`p-4 border rounded-xl ${
                     paymentMethod === "ONLINE" && "border-blue-600"
                   }`}
                 >
                   <CreditCard /> Pay Now
-                </button>
-                <button
+                </AsyncButton>
+                <AsyncButton
                   disabled={mode === "VIDEO"}
                   onClick={() => setPaymentMethod("CASH")}
                   className={`p-4 border rounded-xl ${
@@ -372,7 +373,7 @@ export default function BookingWizard({
                   }`}
                 >
                   <Banknote /> Pay Later
-                </button>
+                </AsyncButton>
               </div>
 
               {paymentMethod === "ONLINE" && (
@@ -389,13 +390,13 @@ export default function BookingWizard({
 
         {/* FOOTER */}
         <div className="p-5 border-t">
-          <button
+          <AsyncButton
             onClick={step < 3 ? handleNext : handleBook}
             disabled={loading}
             className="w-full py-4 bg-black text-white rounded-xl"
           >
             {loading ? <Loader2 className="animate-spin mx-auto" /> : step < 3 ? "Continue" : "Confirm Booking"}
-          </button>
+          </AsyncButton>
         </div>
       </div>
     </div>

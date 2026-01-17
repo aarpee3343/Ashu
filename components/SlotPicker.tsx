@@ -1,10 +1,10 @@
 "use client";
-
+import AsyncButton from "@/components/ui/AsyncButton";
 export default function SlotPicker({ slots, onSelect }: any) {
   return (
     <div className="grid grid-cols-3 gap-2">
       {slots.map((slot: any) => (
-        <button
+        <AsyncButton
           key={slot.id}
           disabled={slot.isBooked}
           onClick={() => onSelect(slot)}
@@ -13,7 +13,7 @@ export default function SlotPicker({ slots, onSelect }: any) {
           }`}
         >
           {slot.startTime} - {slot.endTime}
-        </button>
+        </AsyncButton>
       ))}
     </div>
   );

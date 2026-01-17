@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation"; // Import this
 import Link from "next/link";
+import AsyncButton from "@/components/ui/AsyncButton";
 import { signOut } from "next-auth/react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -80,12 +81,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             )}
             
-            <button
+            <AsyncButton
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="w-9 h-9 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center transition-all duration-200 hover:rotate-180 ml-auto"
             >
               {sidebarCollapsed ? "→" : "←"}
-            </button>
+            </AsyncButton>
           </div>
         </div>
 
@@ -139,20 +140,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <p className="text-xs text-gray-400">admin@healthcare.com</p>
                 </div>
               </div>
-              <button
+              <AsyncButton
                 onClick={() => signOut({ callbackUrl: "/" })}
                 className="w-full py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-lg flex items-center justify-center text-sm transition-all duration-200"
               >
                 🚪 Logout
-              </button>
+              </AsyncButton>
             </>
           ) : (
-            <button
+            <AsyncButton
                 onClick={() => signOut({ callbackUrl: "/" })}
                 className="w-full h-10 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-lg flex items-center justify-center text-xl"
             >
               🚪
-            </button>
+            </AsyncButton>
           )}
         </div>
       </aside>

@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState } from "react";
 import { Activity } from "lucide-react";
 
 type LoaderContextType = {
@@ -11,35 +11,6 @@ const LoaderContext = createContext<LoaderContextType | undefined>(undefined);
 
 export const GlobalLoaderProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
-
-  // --- AUTOMATIC FETCH INTERCEPTOR ---
-  useEffect(() => {
-    // 1. Keep a copy of the original fetch function
-    const originalFetch = window.fetch;
-
-    // 2. Override the browser's fetch function
-    window.fetch = async (...args) => {
-      // Check if we should skip the loader (optional, good for background polling)
-      // e.g. fetch('/api/user', { headers: { 'x-skip-loader': 'true' } })
-      const isHidden = args[1]?.headers && (args[1].headers as any)['x-skip-loader'];
-
-      if (!isHidden) setIsLoading(true); // Show Loader
-
-      try {
-        const response = await originalFetch(...args);
-        return response;
-      } catch (error) {
-        throw error;
-      } finally {
-        if (!isHidden) setIsLoading(false); // Hide Loader
-      }
-    };
-
-    // 3. Cleanup: Restore original fetch when unmounting
-    return () => {
-      window.fetch = originalFetch;
-    };
-  }, []);
 
   return (
     <LoaderContext.Provider value={{ isLoading, setLoading: setIsLoading }}>
@@ -66,6 +37,6 @@ export const GlobalLoaderProvider = ({ children }: { children: React.ReactNode }
 
 export const useGlobalLoader = () => {
   const context = useContext(LoaderContext);
-  if (!context) throw new Error("useGlobalLoader Error");
+  if (!context) throw new Error("useGlobalLoader must be used within GlobalLoaderProvider");
   return context;
 };

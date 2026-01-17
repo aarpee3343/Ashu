@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 export default async function AdminSpecialists() {
   const specialists = await prisma.specialist.findMany({
@@ -89,10 +90,10 @@ export default async function AdminSpecialists() {
             <option value="DIETITIAN">Dietitian</option>
           </select>
         </div>
-        <button className="px-6 py-2.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg font-medium transition-all hover:-translate-y-0.5 flex items-center gap-2">
+        <AsyncButton className="px-6 py-2.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg font-medium transition-all hover:-translate-y-0.5 flex items-center gap-2">
           <span>+</span>
           <span>Add Specialist</span>
-        </button>
+        </AsyncButton>
       </div>
 
       {/* Specialists Table */}
@@ -154,15 +155,15 @@ export default async function AdminSpecialists() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button className="px-3 py-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg transition-colors">
+                        <AsyncButton className="px-3 py-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg transition-colors">
                           View
-                        </button>
-                        <button className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors">
+                        </AsyncButton>
+                        <AsyncButton className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors">
                           Edit
-                        </button>
-                        <button className="px-3 py-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition-colors">
+                        </AsyncButton>
+                        <AsyncButton className="px-3 py-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition-colors">
                           Delete
-                        </button>
+                        </AsyncButton>
                       </div>
                     </td>
                   </tr>
@@ -177,9 +178,9 @@ export default async function AdminSpecialists() {
             <div className="text-6xl mb-4">👨‍⚕️</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Specialists Found</h3>
             <p className="text-gray-600 mb-6">Add healthcare specialists to start accepting appointments.</p>
-            <button className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg font-medium transition-all hover:-translate-y-0.5">
+            <AsyncButton className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg font-medium transition-all hover:-translate-y-0.5">
               + Add First Specialist
-            </button>
+            </AsyncButton>
           </div>
         )}
       </div>

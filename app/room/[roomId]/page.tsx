@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Clock, PhoneOff } from "lucide-react";
 import toast from "react-hot-toast";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 export default function VideoRoom({ params }: { params: { roomId: string } }) {
   const { data: session } = useSession();
@@ -125,12 +126,12 @@ export default function VideoRoom({ params }: { params: { roomId: string } }) {
       </div>
 
       {/* OVERLAY: End Button */}
-      <button 
+      <AsyncButton 
         onClick={handleManualDisconnect}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110"
       >
         <PhoneOff size={24} />
-      </button>
+      </AsyncButton>
 
       {/* VIDEO CONTAINER */}
       <div ref={videoContainerRef} className="w-full h-full" />

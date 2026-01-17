@@ -1,4 +1,5 @@
 "use client";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 export default function BookingConfirmModal({
   open,
@@ -60,7 +61,7 @@ export default function BookingConfirmModal({
             marginTop: "16px",
           }}
         >
-          <button
+          <AsyncButton
             onClick={onClose}
             style={{
               flex: 1,
@@ -71,7 +72,7 @@ export default function BookingConfirmModal({
             }}
           >
             Cancel
-          </button>
+          </AsyncButton>
 
           <a
             href="/login"

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 // --- ICONS ---
 const GoogleIcon = () => (
@@ -133,20 +134,20 @@ export default function Register() {
 
         {/* Social Buttons */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <button 
+          <AsyncButton 
             onClick={() => handleSocialLogin('google')} 
             className="flex items-center justify-center gap-2 border border-gray-300 p-2.5 rounded-xl hover:bg-gray-50 font-semibold text-gray-700 transition-all"
           >
             <GoogleIcon />
             <span>Google</span>
-          </button>
-          <button 
+          </AsyncButton>
+          <AsyncButton 
             disabled 
             className="flex items-center justify-center gap-2 border border-gray-200 p-2.5 rounded-xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed opacity-60"
           >
             <AppleIcon />
             <span>Apple</span>
-          </button>
+          </AsyncButton>
         </div>
 
         <div className="relative my-6 text-center">
@@ -156,8 +157,8 @@ export default function Register() {
 
         {/* Method Toggle */}
         <div className="flex bg-gray-100 p-1 rounded-lg mb-4">
-           <button onClick={() => handleMethodChange("EMAIL")} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${method === "EMAIL" ? "bg-white shadow text-black" : "text-gray-500"}`}>Email</button>
-           <button onClick={() => handleMethodChange("PHONE")} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${method === "PHONE" ? "bg-white shadow text-black" : "text-gray-500"}`}>Phone</button>
+           <AsyncButton onClick={() => handleMethodChange("EMAIL")} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${method === "EMAIL" ? "bg-white shadow text-black" : "text-gray-500"}`}>Email</AsyncButton>
+           <AsyncButton onClick={() => handleMethodChange("PHONE")} className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${method === "PHONE" ? "bg-white shadow text-black" : "text-gray-500"}`}>Phone</AsyncButton>
         </div>
 
         {/* Form */}
@@ -184,9 +185,9 @@ export default function Register() {
                disabled={isOtpVerified} // Lock after verification
              />
              {!isOtpSent && !isOtpVerified && (
-               <button onClick={handleSendOtp} className="bg-black text-white px-4 rounded-lg text-sm font-bold hover:bg-gray-800 whitespace-nowrap">
+               <AsyncButton onClick={handleSendOtp} className="bg-black text-white px-4 rounded-lg text-sm font-bold hover:bg-gray-800 whitespace-nowrap">
                  Verify
-               </button>
+               </AsyncButton>
              )}
              {isOtpVerified && (
                 <span className="flex items-center justify-center px-3 text-green-600 font-bold bg-green-50 rounded-lg border border-green-200">
@@ -213,9 +214,9 @@ export default function Register() {
                    <div className="text-[10px] text-gray-500 mb-4">
                     By continuing, you agree to our <a href="/terms" target="_blank" className="underline">Terms</a> and <a href="/privacy-policy" target="_blank" className="underline">Privacy Policy</a>.
                   </div>
-                   <button onClick={handleVerifyOtp} className="bg-blue-600 text-white px-4 rounded text-sm font-bold hover:bg-blue-700">
+                   <AsyncButton onClick={handleVerifyOtp} className="bg-blue-600 text-white px-4 rounded text-sm font-bold hover:bg-blue-700">
                      Submit
-                   </button>
+                   </AsyncButton>
                 </div>
              </div>
            )}
@@ -234,13 +235,13 @@ export default function Register() {
            )}
 
            {/* Submit Button */}
-           <button 
+           <AsyncButton 
              onClick={handleRegister} 
              disabled={loading || !isOtpVerified}
              className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 mt-4 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-100"
            >
              {loading ? "Creating Profile..." : "Complete Registration"}
-           </button>
+           </AsyncButton>
         </div>
 
         {/* Pass Callback to Login */}

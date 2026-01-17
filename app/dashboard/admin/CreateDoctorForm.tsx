@@ -3,6 +3,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 export default function CreateDoctorForm() {
   const router = useRouter();
@@ -191,7 +192,7 @@ export default function CreateDoctorForm() {
           )}
         </div>
 
-        <button
+        <AsyncButton
           disabled={loading}
           className={`
             w-full py-3 rounded-lg font-medium transition-all duration-300
@@ -208,7 +209,7 @@ export default function CreateDoctorForm() {
               <div className="ml-3 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             </div>
           ) : "Create Specialist"}
-        </button>
+        </AsyncButton>
       </form>
     </div>
   );

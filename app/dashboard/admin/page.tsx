@@ -1,5 +1,6 @@
 // app/dashboard/admin/page.tsx
 import { prisma } from "@/lib/prisma";
+import AsyncButton from "@/components/ui/AsyncButton";
 import CreateDoctorForm from "./CreateDoctorForm"; // We'll extract the form logic
 
 export default async function AdminDashboard() {
@@ -37,12 +38,12 @@ export default async function AdminDashboard() {
         <div className="bg-white rounded-2xl shadow-soft border border-gray-200 p-6 h-fit">
            <h3 className="font-bold text-gray-900 mb-4">Quick Actions</h3>
            <div className="space-y-3">
-              <button className="w-full text-left p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium transition">
+              <AsyncButton className="w-full text-left p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium transition">
                  📄 Generate Monthly Report
-              </button>
-              <button className="w-full text-left p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium transition">
+              </AsyncButton>
+              <AsyncButton className="w-full text-left p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium transition">
                  ⚙️ Manage System Settings
-              </button>
+              </AsyncButton>
            </div>
         </div>
       </div>

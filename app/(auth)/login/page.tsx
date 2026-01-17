@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 // SVG Icons Component
 const GoogleIcon = () => (
@@ -94,22 +95,22 @@ export default function Login() {
         <h1 className="text-2xl font-bold mb-6 text-center">Welcome Back</h1>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <button 
+          <AsyncButton 
             onClick={() => handleSocial('google')} 
             className="flex items-center justify-center gap-2 border border-gray-300 p-2.5 rounded-xl hover:bg-gray-50 font-semibold text-gray-700 transition-all"
           >
             <GoogleIcon />
             <span>Google</span>
-          </button>
+          </AsyncButton>
           
-          <button 
+          <AsyncButton 
             disabled 
             className="flex items-center justify-center gap-2 border border-gray-200 p-2.5 rounded-xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed opacity-60"
             title="Coming Soon"
           >
             <AppleIcon />
             <span>Apple</span>
-          </button>
+          </AsyncButton>
         </div>
 
         <div className="relative my-6 text-center">
@@ -135,7 +136,7 @@ export default function Login() {
              <div className="animate-fade-in">
                <div className="flex justify-between items-center mb-1">
                  <label className="text-xs font-bold text-gray-600">Password for {identifier}</label>
-                 <button type="button" onClick={() => setStep("INPUT")} className="text-xs text-blue-600 underline">Change</button>
+                 <AsyncButton type="button" onClick={() => setStep("INPUT")} className="text-xs text-blue-600 underline">Change</AsyncButton>
                </div>
                <input 
                  type="password"
@@ -152,7 +153,7 @@ export default function Login() {
              <div className="animate-fade-in">
                <div className="flex justify-between items-center mb-1">
                  <label className="text-xs font-bold text-gray-600">OTP sent to {identifier}</label>
-                 <button type="button" onClick={() => setStep("INPUT")} className="text-xs text-blue-600 underline">Change</button>
+                 <AsyncButton type="button" onClick={() => setStep("INPUT")} className="text-xs text-blue-600 underline">Change</AsyncButton>
                </div>
                <div className="bg-blue-50 p-2 mb-2 rounded text-center text-xs text-green-700">Simulated OTP: <strong>{generatedOtp}</strong></div>
                <input 
@@ -166,13 +167,13 @@ export default function Login() {
              </div>
            )}
 
-           <button 
+           <AsyncButton 
              type="submit" 
              disabled={loading}
              className="w-full bg-black text-white font-bold py-3 rounded-lg hover:bg-gray-800 transition-all"
            >
              {loading ? "Processing..." : step === "INPUT" ? "Continue" : "Login"}
-           </button>
+           </AsyncButton>
         </form>
         
         {/* Pass Callback to Register */}

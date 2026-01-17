@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 export default function Error({
   error,
@@ -25,18 +26,18 @@ export default function Error({
       </p>
       
       <div className="flex gap-4">
-        <button
+        <AsyncButton
           onClick={() => window.location.href = "/"}
           className="px-6 py-3 rounded-xl border border-gray-300 font-bold text-gray-700 hover:bg-gray-100 transition"
         >
           Go Home
-        </button>
-        <button
+        </AsyncButton>
+        <AsyncButton
           onClick={() => reset()}
           className="px-6 py-3 rounded-xl bg-black text-white font-bold hover:bg-gray-800 transition flex items-center gap-2"
         >
           <RefreshCcw size={18} /> Try Again
-        </button>
+        </AsyncButton>
       </div>
       
       {/* Dev Info (Optional: Hide in Production) */}

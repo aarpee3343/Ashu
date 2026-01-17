@@ -9,6 +9,7 @@ import {
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import AsyncButton from "@/components/ui/AsyncButton";
 import { generatePrescriptionPDF } from "@/lib/pdfGenerator";
 
 const generateInvoice = async (data: any) => {
@@ -163,12 +164,12 @@ export default function UserDashboardClient({ user }: any) {
             { id: "RECORDS", icon: FileText, label: "Records" },
             { id: "PROFILE", icon: User, label: "Profile" },
           ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            <AsyncButton key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`flex-1 py-3 min-w-[80px] rounded-xl flex flex-col items-center gap-1 transition-all ${activeTab === tab.id ? "bg-black text-white" : "text-gray-400 hover:bg-gray-50"}`}
             >
               <tab.icon size={18} />
               <span className="text-[9px] font-bold uppercase">{tab.label}</span>
-            </button>
+            </AsyncButton>
           ))}
         </div>
       </div>
@@ -200,9 +201,9 @@ export default function UserDashboardClient({ user }: any) {
                   <div>
                     <h3 className="font-bold text-gray-900">{formatDoctorName(b.specialist.name)}</h3>
                     <p className="text-xs text-gray-500">{b.specialist.category} • {b.slotTime}</p>
-                    <button onClick={() => setSelectedBooking(b)} className="mt-2 text-xs font-bold text-blue-600 flex items-center gap-1">
+                    <AsyncButton onClick={() => setSelectedBooking(b)} className="mt-2 text-xs font-bold text-blue-600 flex items-center gap-1">
                       <Eye size={12} /> View Details
-                    </button>
+                    </AsyncButton>
                   </div>
                 </div>
                 {/* Action Buttons */}
@@ -248,19 +249,19 @@ export default function UserDashboardClient({ user }: any) {
                         <span className="text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded font-bold flex items-center">
                            <AlertTriangle size={12} className="mr-1" /> DUE: ₹{due}
                         </span>
-                        <button onClick={() => setPayModalData(b)} className="text-[10px] bg-black text-white px-2 py-1 rounded font-bold flex items-center">
+                        <AsyncButton onClick={() => setPayModalData(b)} className="text-[10px] bg-black text-white px-2 py-1 rounded font-bold flex items-center">
                            <CreditCard size={12} className="mr-1" /> Pay Balance
-                        </button>
+                        </AsyncButton>
                         </div>
                      )}
 
                      {isCompletedAndPaid && (
-                        <button
+                        <AsyncButton
                         onClick={() => generateInvoice({ booking: b, user: user })}
                         className="block mt-1 text-[10px] text-blue-600 underline flex items-center"
                         >
                         <Download size={12} className="mr-1" /> Download Invoice
-                        </button>
+                        </AsyncButton>
                      )}
                   </div>
                   </div>
@@ -283,7 +284,7 @@ export default function UserDashboardClient({ user }: any) {
                          <p className="text-xs text-gray-500">{formatDoctorName(b.specialist.name)} • {format(new Date(b.date), "d MMM")}</p>
                        </div>
                     </div>
-                    <button onClick={() => generatePrescriptionPDF(b, b.prescription)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><Download size={16} /></button>
+                    <AsyncButton onClick={() => generatePrescriptionPDF(b, b.prescription)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><Download size={16} /></AsyncButton>
                  </div>
               ))}
            </div>
@@ -297,7 +298,7 @@ export default function UserDashboardClient({ user }: any) {
               <div className="bg-white p-5 rounded-2xl border border-gray-100">
                  <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-900 flex items-center gap-2"><Activity size={18} /> My Vitals</h3>
-                    <button onClick={handleSaveVitals} disabled={loading} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold">{loading ? "Saving..." : "Update"}</button>
+                    <AsyncButton onClick={handleSaveVitals} disabled={loading} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold">{loading ? "Saving..." : "Update"}</AsyncButton>
                  </div>
                  <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -334,7 +335,7 @@ export default function UserDashboardClient({ user }: any) {
                        </select>
                     </div>
                     <textarea placeholder="Address" value={profileData.address} onChange={e => setProfileData({...profileData, address: e.target.value})} className="w-full p-3 border rounded-xl" />
-                    <button onClick={handleUpdateProfile} disabled={loading} className="w-full bg-black text-white font-bold py-3 rounded-xl">{loading ? "Saving..." : "Save Changes"}</button>
+                    <AsyncButton onClick={handleUpdateProfile} disabled={loading} className="w-full bg-black text-white font-bold py-3 rounded-xl">{loading ? "Saving..." : "Save Changes"}</AsyncButton>
                  </div>
               </div>
 
@@ -342,7 +343,7 @@ export default function UserDashboardClient({ user }: any) {
               <div className="bg-white p-5 rounded-2xl border border-gray-100">
                  <div className="flex justify-between items-center mb-3">
                     <h3 className="font-bold text-gray-900">Family Members</h3>
-                    <button onClick={() => setShowFamilyModal(true)} className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold">+ Add</button>
+                    <AsyncButton onClick={() => setShowFamilyModal(true)} className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold">+ Add</AsyncButton>
                  </div>
                  
                  {(!familyMembers || familyMembers.length === 0) ? (
@@ -369,9 +370,9 @@ export default function UserDashboardClient({ user }: any) {
       {selectedBooking && (
          <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative">
-               <button onClick={() => setSelectedBooking(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200">
+               <AsyncButton onClick={() => setSelectedBooking(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200">
                <X size={16} />
-               </button>
+               </AsyncButton>
                
                <h3 className="font-bold text-xl mb-1">Booking Details</h3>
                <p className="text-xs text-gray-500 mb-6">ID: #{selectedBooking.id}</p>
@@ -442,7 +443,7 @@ export default function UserDashboardClient({ user }: any) {
       {payModalData && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
            <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative text-center">
-              <button onClick={() => setPayModalData(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></button>
+              <AsyncButton onClick={() => setPayModalData(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></AsyncButton>
               
               <h3 className="font-bold text-lg mb-2">Pay Remaining Balance</h3>
               <h1 className="text-4xl font-bold text-gray-900 mb-6">₹{payModalData.totalPrice - payModalData.amountPaid}</h1>
@@ -459,9 +460,9 @@ export default function UserDashboardClient({ user }: any) {
                  className="w-full p-3 border rounded-xl text-center font-mono tracking-widest mb-3"
               />
               
-              <button onClick={handlePayBalance} disabled={loading} className="w-full bg-green-600 text-white font-bold py-3 rounded-xl">
+              <AsyncButton onClick={handlePayBalance} disabled={loading} className="w-full bg-green-600 text-white font-bold py-3 rounded-xl">
                  {loading ? <Loader2 className="animate-spin mx-auto" /> : "Verify Payment"}
-              </button>
+              </AsyncButton>
            </div>
         </div>
       )}
@@ -477,8 +478,8 @@ export default function UserDashboardClient({ user }: any) {
                   <input placeholder="Age" className="flex-1 p-3 border rounded-xl" onChange={e => setNewMember({...newMember, age: e.target.value})} />
                   <select className="flex-1 p-3 border rounded-xl bg-white" onChange={e => setNewMember({...newMember, gender: e.target.value})}><option>Male</option><option>Female</option></select>
                </div>
-               <button onClick={handleAddFamily} disabled={loading} className="w-full bg-black text-white font-bold py-3 rounded-xl">{loading ? "Saving..." : "Add Member"}</button>
-               <button onClick={() => setShowFamilyModal(false)} className="w-full text-center py-3 text-gray-500 mt-2">Cancel</button>
+               <AsyncButton onClick={handleAddFamily} disabled={loading} className="w-full bg-black text-white font-bold py-3 rounded-xl">{loading ? "Saving..." : "Add Member"}</AsyncButton>
+               <AsyncButton onClick={() => setShowFamilyModal(false)} className="w-full text-center py-3 text-gray-500 mt-2">Cancel</AsyncButton>
             </div>
          </div>
       )}

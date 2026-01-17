@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { MapPin, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 export default function GeoLocationInput({ onLocationSelect }: any) {
   const [loading, setLoading] = useState(false);
@@ -31,13 +32,13 @@ export default function GeoLocationInput({ onLocationSelect }: any) {
     <div className="space-y-2">
       <label className="text-xs font-bold uppercase text-gray-500">Service Location</label>
       <div className="flex gap-2">
-        <button 
+        <AsyncButton 
           onClick={handleGetLocation}
           className="bg-blue-50 text-blue-600 px-4 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-100 transition"
         >
           {loading ? <Loader2 className="animate-spin" size={18} /> : <MapPin size={18} />}
           {address ? "Update Location" : "Use My Location"}
-        </button>
+        </AsyncButton>
         <input 
           value={address} 
           disabled 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import AsyncButton from "@/components/ui/AsyncButton";
 
 export default async function AdminSlots() {
   const slots = await prisma.slot.findMany({
@@ -95,9 +96,9 @@ export default async function AdminSlots() {
       {/* Actions Bar */}
       <div className="bg-white rounded-xl p-4 mb-6 shadow-soft border border-gray-200 flex justify-between items-center">
         <div className="flex gap-3">
-          <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-500">
+          <AsyncButton className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-500">
              Filter by Date
-          </button>
+          </AsyncButton>
           <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500">
             <option value="all">All Specialists</option>
             <option value="available">Available Only</option>
@@ -105,9 +106,9 @@ export default async function AdminSlots() {
           </select>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg text-sm font-medium transition-all hover:-translate-y-0.5">
+          <AsyncButton className="px-4 py-2 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg text-sm font-medium transition-all hover:-translate-y-0.5">
             + Add New Slot
-          </button>
+          </AsyncButton>
         </div>
       </div>
 
@@ -151,12 +152,12 @@ export default async function AdminSlots() {
             </div>
 
             <div className="flex gap-2">
-              <button disabled={slot.isBooked} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${slot.isBooked ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`}>
+              <AsyncButton disabled={slot.isBooked} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${slot.isBooked ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`}>
                 {slot.isBooked ? 'Reserved' : 'Available'}
-              </button>
-              <button className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors">
+              </AsyncButton>
+              <AsyncButton className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors">
                 Edit
-              </button>
+              </AsyncButton>
             </div>
           </div>
         ))}

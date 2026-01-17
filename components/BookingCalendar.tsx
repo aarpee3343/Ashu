@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { format, addDays, startOfToday } from "date-fns";
 import BookingPaymentModal from "./BookingPaymentModal";
+import AsyncButton from "@/components/ui/AsyncButton";
 import toast from "react-hot-toast";
 
 // CONSTANT: Time Slots (Must match Doctor Dashboard)
@@ -75,7 +76,7 @@ export default function BookingCalendar({ specialist }: any) {
             {dates.map((date) => {
               const isSelected = selectedDate?.toDateString() === date.toDateString();
               return (
-                <button
+                <AsyncButton
                   key={date.toString()}
                   onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
                   className={`flex-shrink-0 w-24 p-2 rounded-xl border transition-all text-center ${
@@ -90,7 +91,7 @@ export default function BookingCalendar({ specialist }: any) {
                   <div className="text-lg font-bold">
                     {format(date, "d")}
                   </div>
-                </button>
+                </AsyncButton>
               );
             })}
           </div>
@@ -107,7 +108,7 @@ export default function BookingCalendar({ specialist }: any) {
                 const isBooked = bookedSlots.includes(slot);
                 const isSelected = selectedSlot === slot;
                 return (
-                  <button
+                  <AsyncButton
                     key={slot}
                     disabled={isBooked}
                     onClick={() => setSelectedSlot(slot)}
@@ -120,7 +121,7 @@ export default function BookingCalendar({ specialist }: any) {
                     }`}
                   >
                     {slot}
-                  </button>
+                  </AsyncButton>
                 );
               })}
             </div>
@@ -153,22 +154,22 @@ export default function BookingCalendar({ specialist }: any) {
           <div>
             <label className="text-sm font-bold text-gray-900 block mb-2">Visit Type</label>
             <div className="flex bg-white p-1 rounded-lg border border-gray-200">
-              <button 
+              <AsyncButton 
                 onClick={() => setLocationType("CLINIC")}
                 className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${
                   locationType === "CLINIC" ? "bg-blue-100 text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-900"
                 }`}
               >
                 🏥 Clinic Visit
-              </button>
-              <button 
+              </AsyncButton>
+              <AsyncButton 
                 onClick={() => setLocationType("HOME")}
                 className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${
                   locationType === "HOME" ? "bg-blue-100 text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-900"
                 }`}
               >
                 🏠 Home Visit
-              </button>
+              </AsyncButton>
             </div>
           </div>
 
@@ -195,13 +196,13 @@ export default function BookingCalendar({ specialist }: any) {
               <p className="text-2xl font-bold text-gray-900">₹{totalPrice}</p>
             </div>
           </div>
-          <button
+          <AsyncButton
             onClick={handleBookClick}
             disabled={!selectedDate || !selectedSlot}
             className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all shadow-lg"
           >
             Review & Pay
-          </button>
+          </AsyncButton>
         </div>
       </div>
 
