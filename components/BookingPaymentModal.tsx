@@ -209,7 +209,7 @@ export default function BookingPaymentModal({
                        className={`py-2 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${locationType === "HOME" ? "bg-white shadow text-green-600" : "text-gray-500 hover:text-gray-700"}`}
                      >
                        <Home size={16} /> Home
-                     </butAsyncButtonton>
+                     </AsyncButton>
                      {specialist.isVideoAvailable && (
                        <AsyncButton 
                          onClick={() => { setLocationType("VIDEO"); setDuration(15); }}
