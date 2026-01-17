@@ -360,9 +360,9 @@ export default function BookingPaymentModal({
 
         <div className="p-4 border-t bg-gray-50 flex gap-3 sticky bottom-0 z-10 bg-white">
           {step === 2 ? (
-             <AsyncButton onClick={() => setStep(1)} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Back</button>
+             <AsyncButton onClick={() => setStep(1)} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Back</AsyncButton>
           ) : (
-             <AsyncButton onClick={onClose} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Cancel</button>
+             <AsyncButton onClick={onClose} className="flex-1 py-3 text-gray-600 bg-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Cancel</AsyncButton>
           )}
 
           {step === 1 ? (
