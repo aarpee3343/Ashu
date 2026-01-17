@@ -213,7 +213,7 @@ ${invoiceStyles}
 
   const options = {
     filename: `Invoice-INVO${booking.id}.pdf`,
-    margin: [10, 10, 10, 10],
+    margin: [10, 10, 10, 10] as [number, number, number, number],
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: { 
       scale: 2, 
