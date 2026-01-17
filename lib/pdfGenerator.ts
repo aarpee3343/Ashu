@@ -15,10 +15,11 @@ export const generatePrescriptionPDF = async (booking: any, prescriptionData: st
   const doc = new jsPDF();
 
   // --- Theme Colors ---
-  const themeColor = [13, 148, 136]; // Teal-600
-  const lightThemeColor = [240, 253, 250]; // Teal-50
-  const slateDark = [30, 41, 59]; // Slate-800
-  const slateGray = [100, 116, 139]; // Slate-500
+  const themeColor: [number, number, number] = [13, 148, 136];
+  const lightThemeColor: [number, number, number] = [240, 253, 250];
+  const slateDark: [number, number, number] = [30, 41, 59];
+  const slateGray: [number, number, number] = [100, 116, 139];
+
 
   // --- Dimensions ---
   const margin = 15;
