@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
@@ -24,6 +24,10 @@ const AppleIcon = () => (
 
 export default function Login() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // 1. Get Return URL (Default to Dashboard)
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard/user";
   
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -32,8 +36,8 @@ export default function Login() {
   const [step, setStep] = useState<"INPUT" | "PASSWORD" | "OTP">("INPUT");
   const [loading, setLoading] = useState(false);
 
-  // Social Login
-  const handleSocial = (provider: string) => signIn(provider, { callbackUrl: "/dashboard/user" });
+  // Social Login (Pass callbackUrl)
+  const handleSocial = (provider: string) => signIn(provider, { callbackUrl });
 
   // Determine Next Step based on Input
   const handleNext = (e: React.FormEvent) => {
@@ -78,7 +82,9 @@ export default function Login() {
       setLoading(false);
     } else {
       toast.success("Login Successful!");
-      router.push("/dashboard/user");
+      // 2. Redirect to original page
+      router.push(callbackUrl);
+      router.refresh();
     }
   };
 
@@ -88,7 +94,6 @@ export default function Login() {
         <h1 className="text-2xl font-bold mb-6 text-center">Welcome Back</h1>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
-          {/* Google Button */}
           <button 
             onClick={() => handleSocial('google')} 
             className="flex items-center justify-center gap-2 border border-gray-300 p-2.5 rounded-xl hover:bg-gray-50 font-semibold text-gray-700 transition-all"
@@ -97,7 +102,6 @@ export default function Login() {
             <span>Google</span>
           </button>
           
-          {/* Apple Button (Disabled) */}
           <button 
             disabled 
             className="flex items-center justify-center gap-2 border border-gray-200 p-2.5 rounded-xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed opacity-60"
@@ -171,8 +175,9 @@ export default function Login() {
            </button>
         </form>
         
+        {/* Pass Callback to Register */}
         <p className="text-center text-sm text-gray-500 mt-6">
-           New here? <Link href="/register" className="text-blue-600 font-bold hover:underline">Create Account</Link>
+           New here? <Link href={`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`} className="text-blue-600 font-bold hover:underline">Create Account</Link>
         </p>
       </div>
     </div>

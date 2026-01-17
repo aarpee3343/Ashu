@@ -2,14 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { 
-  Calendar, CreditCard, User, Users, FileText, 
-  MapPin, Clock, Eye, Download, Activity, X, 
-  Plus, Save, ChevronRight, CheckCircle, Loader2 
-} from "lucide-react";
+  User, AtSign, Phone, MapPin, Calendar, CreditCard, Users, 
+  FileText, Clock, Eye, Download, Activity, X, Plus, Save, 
+  ChevronRight, CheckCircle, Loader2, AlertTriangle
+} from 'lucide-react';
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { generatePrescriptionPDF } from "@/lib/pdfGenerator";
+
+const generateInvoice = async (data: any) => {
+  try {
+    // Dynamically import the invoice generator
+    const { generateInvoice } = await import('@/components/InvoiceGenerator');
+    await generateInvoice(data);
+  } catch (error) {
+    console.error('Error generating invoice:', error);
+    toast.error('Failed to generate invoice');
+  }
+};
 
 export default function UserDashboardClient({ user }: any) {
   const router = useRouter();
@@ -24,6 +35,18 @@ export default function UserDashboardClient({ user }: any) {
   // Data States
   const [familyMembers, setFamilyMembers] = useState(user.familyMembers || []);
   const [vitals, setVitals] = useState(user.vitals?.[0] || {}); 
+
+  const formatDoctorName = (name: string) => {
+  if (!name) return '';
+  
+  const trimmedName = name.trim();
+  
+  // Remove any existing Dr. prefixes (case-insensitive)
+  const cleanedName = trimmedName.replace(/^(Dr\.?\s*)/i, '');
+  
+  // Add Dr. prefix to cleaned name
+  return `Dr. ${cleanedName}`;
+};
   
   // Forms
   const [profileData, setProfileData] = useState({ 
@@ -157,16 +180,25 @@ export default function UserDashboardClient({ user }: any) {
         {activeTab === "APPOINTMENTS" && (
           <div className="space-y-4">
             {user.bookings.length === 0 && <p className="text-center text-gray-400 mt-10">No appointments yet.</p>}
-            {user.bookings.map((b: any) => (
+            {user.bookings.map((b: any) => {
+              const isOngoing = b.dailyLogs?.some((l: any) => l.status === 'COMPLETED') && b.status !== 'COMPLETED';
+              const displayStatus = isOngoing ? 'ONGOING' : b.status;
+              
+              return (
               <div key={b.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative">
-                <div className={`absolute top-3 right-3 px-2 py-0.5 text-[10px] font-bold rounded ${b.status === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : b.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>{b.status}</div>
+                <div className={`absolute top-3 right-3 px-2 py-0.5 text-[10px] font-bold rounded ${
+                  displayStatus === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : 
+                  displayStatus === 'ONGOING' ? 'bg-orange-100 text-orange-700' :
+                  displayStatus === 'COMPLETED' ? 'bg-green-100 text-green-700' : 
+                  'bg-gray-100 text-gray-700'
+                }`}>{displayStatus}</div>
                 <div className="flex gap-4">
                   <div className="bg-gray-100 w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-gray-600">
                     <span className="text-lg">{format(new Date(b.date), "d")}</span>
                     <span className="text-[9px] uppercase">{format(new Date(b.date), "MMM")}</span>
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900">{b.specialist.name}</h3>
+                    <h3 className="font-bold text-gray-900">{formatDoctorName(b.specialist.name)}</h3>
                     <p className="text-xs text-gray-500">{b.specialist.category} • {b.slotTime}</p>
                     <button onClick={() => setSelectedBooking(b)} className="mt-2 text-xs font-bold text-blue-600 flex items-center gap-1">
                       <Eye size={12} /> View Details
@@ -180,41 +212,61 @@ export default function UserDashboardClient({ user }: any) {
                    )}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
 
         {/* --- 2. FINANCE TAB --- */}
         {activeTab === "FINANCE" && (
-          <div className="space-y-3">
-             {user.bookings.map((b: any) => {
+         <div className="space-y-3">
+            {user.bookings.map((b: any) => {
                const due = b.totalPrice - b.amountPaid;
-               // Logic Fix: If status is COMPLETED, assume settled.
-               const isPaid = b.amountPaid >= b.totalPrice || b.status === 'COMPLETED';
-               
+               const isCompletedAndPaid = b.status === 'COMPLETED' && b.amountPaid >= b.totalPrice;
+
                return (
-               <div key={b.id} className="bg-white p-4 rounded-xl border border-gray-100 flex justify-between items-center">
+                  <div key={b.id} className="bg-white p-4 rounded-xl border border-gray-100 flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-sm">Dr. {b.specialist.name}</p>
-                    <p className="text-xs text-gray-400">{format(new Date(b.date), "dd MMM")}</p>
+                     <p className="font-bold text-sm flex items-center">
+                        <User size={18} className="mr-2" /> {formatDoctorName(b.specialist.name)}
+                     </p>
+                     <p className="text-xs text-gray-400 flex items-center">
+                        <Calendar size={16} className="mr-2" />
+                        {format(new Date(b.date), "dd MMM")}
+                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-gray-900">₹{b.totalPrice}</p>
-                    {isPaid ? (
-                       <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded font-bold">PAID</span>
-                    ) : (
-                       <div className="flex flex-col items-end gap-1">
-                         <span className="text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded font-bold">DUE: ₹{due}</span>
-                         <button onClick={() => setPayModalData(b)} className="text-[10px] bg-black text-white px-2 py-1 rounded font-bold">Pay Balance</button>
-                       </div>
-                    )}
-                    {isPaid && (
-                       <button onClick={() => toast.success("Invoice Downloading...")} className="block mt-1 text-[10px] text-blue-600 underline">Invoice</button>
-                    )}
+                     <p className="font-bold text-gray-900">
+                        ₹{b.totalPrice}
+                     </p>
+
+                     {b.amountPaid >= b.totalPrice ? (
+                        <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded font-bold flex items-center justify-center">
+                        <CheckCircle size={12} className="mr-1" /> PAID
+                        </span>
+                     ) : (
+                        <div className="flex flex-col items-end gap-1">
+                        <span className="text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded font-bold flex items-center">
+                           <AlertTriangle size={12} className="mr-1" /> DUE: ₹{due}
+                        </span>
+                        <button onClick={() => setPayModalData(b)} className="text-[10px] bg-black text-white px-2 py-1 rounded font-bold flex items-center">
+                           <CreditCard size={12} className="mr-1" /> Pay Balance
+                        </button>
+                        </div>
+                     )}
+
+                     {isCompletedAndPaid && (
+                        <button
+                        onClick={() => generateInvoice({ booking: b, user: user })}
+                        className="block mt-1 text-[10px] text-blue-600 underline flex items-center"
+                        >
+                        <Download size={12} className="mr-1" /> Download Invoice
+                        </button>
+                     )}
                   </div>
-               </div>
-             )})}
-          </div>
+                  </div>
+               );
+            })}
+            </div>
         )}
 
         {/* --- 3. RECORDS TAB --- */}
@@ -228,7 +280,7 @@ export default function UserDashboardClient({ user }: any) {
                        <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><FileText size={20} /></div>
                        <div>
                          <p className="font-bold text-sm">Prescription</p>
-                         <p className="text-xs text-gray-500">Dr. {b.specialist.name} • {format(new Date(b.date), "d MMM")}</p>
+                         <p className="text-xs text-gray-500">{formatDoctorName(b.specialist.name)} • {format(new Date(b.date), "d MMM")}</p>
                        </div>
                     </div>
                     <button onClick={() => generatePrescriptionPDF(b, b.prescription)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><Download size={16} /></button>
@@ -315,53 +367,76 @@ export default function UserDashboardClient({ user }: any) {
 
       {/* --- MODAL: VIEW DETAILS --- */}
       {selectedBooking && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-           <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative">
-              <button onClick={() => setSelectedBooking(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></button>
-              
-              <h3 className="font-bold text-xl mb-1">Booking Details</h3>
-              <p className="text-xs text-gray-500 mb-6">ID: #{selectedBooking.id}</p>
-              
-              <div className="space-y-4 text-sm">
-                 <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-500">Doctor</span>
-                    <span className="font-bold">Dr. {selectedBooking.specialist.name}</span>
-                 </div>
-                 <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-500">Patient</span>
-                    <span className="font-bold">{selectedBooking.familyMember ? selectedBooking.familyMember.name : "Myself"}</span>
-                 </div>
-                 <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-500">Date & Time</span>
-                    <span className="font-bold">{format(new Date(selectedBooking.date), "d MMM")} • {selectedBooking.slotTime}</span>
-                 </div>
-                 <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-500">Fee Status</span>
-                    {/* Fixed Display Logic in Modal too */}
-                    <span className={(selectedBooking.amountPaid >= selectedBooking.totalPrice || selectedBooking.status === 'COMPLETED') ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                        {(selectedBooking.amountPaid >= selectedBooking.totalPrice || selectedBooking.status === 'COMPLETED') ? "Paid Full" : `Due ₹${selectedBooking.totalPrice - selectedBooking.amountPaid}`}
-                    </span>
-                 </div>
-                 
-                 {selectedBooking.locationType === 'CLINIC' && selectedBooking.clinic && (
-                    <div className="bg-gray-50 p-3 rounded-xl mt-2">
-                       <p className="font-bold text-xs text-gray-500 uppercase mb-1">Clinic Address</p>
-                       <p className="font-bold">{selectedBooking.clinic.name}</p>
-                       <p className="text-xs text-gray-600">{selectedBooking.clinic.address}, {selectedBooking.clinic.city}</p>
-                       <a href={`https://maps.google.com/?q=${selectedBooking.clinic.address}`} target="_blank" className="text-blue-600 text-xs font-bold mt-2 inline-flex items-center gap-1"><MapPin size={12} /> View on Map</a>
-                    </div>
-                 )}
-                 
-                 {selectedBooking.locationType === 'HOME' && (
-                    <div className="bg-gray-50 p-3 rounded-xl mt-2">
-                       <p className="font-bold text-xs text-gray-500 uppercase mb-1">Home Visit Address</p>
-                       <p className="text-sm">{selectedBooking.visitAddress}</p>
-                    </div>
-                 )}
-              </div>
-           </div>
-        </div>
-      )}
+         <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative">
+               <button onClick={() => setSelectedBooking(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200">
+               <X size={16} />
+               </button>
+               
+               <h3 className="font-bold text-xl mb-1">Booking Details</h3>
+               <p className="text-xs text-gray-500 mb-6">ID: #{selectedBooking.id}</p>
+               
+               <div className="space-y-4 text-sm">
+               <div className="flex justify-between py-2 border-b">
+                  <span className="text-gray-500">Doctor</span>
+                  {/* FIXED: Use selectedBooking instead of b */}
+                  <span className="font-bold">{formatDoctorName(selectedBooking.specialist.name)}</span>
+               </div>
+               
+               <div className="flex justify-between py-2 border-b">
+                  <span className="text-gray-500">Patient</span>
+                  <span className="font-bold">
+                     {selectedBooking.familyMember ? selectedBooking.familyMember.name : "Myself"}
+                  </span>
+               </div>
+               
+               <div className="flex justify-between py-2 border-b">
+                  <span className="text-gray-500">Date & Time</span>
+                  <span className="font-bold">
+                     {format(new Date(selectedBooking.date), "d MMM")} • {selectedBooking.slotTime}
+                  </span>
+               </div>
+               
+               <div className="flex justify-between py-2 border-b">
+                  <span className="text-gray-500">Fee Status</span>
+                  <span className={
+                     (selectedBooking.amountPaid >= selectedBooking.totalPrice || selectedBooking.status === 'COMPLETED') 
+                     ? "text-green-600 font-bold" 
+                     : "text-red-600 font-bold"
+                  }>
+                     {(selectedBooking.amountPaid >= selectedBooking.totalPrice || selectedBooking.status === 'COMPLETED') 
+                     ? "Paid Full" 
+                     : `Due ₹${selectedBooking.totalPrice - selectedBooking.amountPaid}`}
+                  </span>
+               </div>
+               
+               {selectedBooking.locationType === 'CLINIC' && selectedBooking.clinic && (
+                  <div className="bg-gray-50 p-3 rounded-xl mt-2">
+                     <p className="font-bold text-xs text-gray-500 uppercase mb-1">Clinic Address</p>
+                     <p className="font-bold">{selectedBooking.clinic.name}</p>
+                     <p className="text-xs text-gray-600">
+                     {selectedBooking.clinic.address}, {selectedBooking.clinic.city}
+                     </p>
+                     <a 
+                     href={`https://maps.google.com/?q=${selectedBooking.clinic.address}`} 
+                     target="_blank" 
+                     className="text-blue-600 text-xs font-bold mt-2 inline-flex items-center gap-1"
+                     >
+                     <MapPin size={12} /> View on Map
+                     </a>
+                  </div>
+               )}
+               
+               {selectedBooking.locationType === 'HOME' && (
+                  <div className="bg-gray-50 p-3 rounded-xl mt-2">
+                     <p className="font-bold text-xs text-gray-500 uppercase mb-1">Home Visit Address</p>
+                     <p className="text-sm">{selectedBooking.visitAddress}</p>
+                  </div>
+               )}
+               </div>
+            </div>
+         </div>
+         )}
 
       {/* --- MODAL: PAY BALANCE --- */}
       {payModalData && (

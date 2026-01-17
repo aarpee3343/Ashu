@@ -4,19 +4,49 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { rating, comment, userId, specialistId, bookingId } = body;
+    const { rating, comment, userId, specialistId } = body;
 
-    if (!bookingId || !userId || !specialistId || !rating) {
+    if (!userId || !specialistId || !rating) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // 1. GENUINE REVIEW CHECK
+    // Find a booking that is COMPLETED and FULLY PAID
+    const validBooking = await prisma.booking.findFirst({
+      where: {
+        userId: Number(userId),
+        specialistId: Number(specialistId),
+        status: "COMPLETED",
+        // Check if Paid Amount covers Total Price
+        amountPaid: {
+            gte: prisma.booking.fields.totalPrice
+        }
+      }
+    });
+
+    if (!validBooking) {
+      return NextResponse.json({ 
+        error: "You can only review doctors after a completed and paid appointment." 
+      }, { status: 403 });
+    }
+
+    // 2. Prevent Duplicate Reviews for same booking
+    const existingReview = await prisma.review.findUnique({
+        where: { bookingId: validBooking.id }
+    });
+
+    if (existingReview) {
+        return NextResponse.json({ error: "You have already reviewed this appointment." }, { status: 409 });
+    }
+
+    // 3. Create Review
     const review = await prisma.review.create({
       data: {
         rating: Number(rating),
         comment: comment,
         userId: Number(userId),
         specialistId: Number(specialistId),
-        bookingId: Number(bookingId) // <--- This was missing!
+        bookingId: validBooking.id // Link to specific booking proof
       }
     });
 

@@ -14,7 +14,7 @@ interface SEOProps {
 export default function SEO({
   title = "ReviveHub | Healthcare Specialists Platform",
   description = "Connect with trusted physiotherapists, nutritionists, speech therapists, and dietitians. Book online consultations, video calls, or home visits.",
-  canonical = "https://revivehub.com",
+  canonical = "https://revivehub.co.in",
   ogImage = "/og-image.png",
   ogType = "website",
   twitterCard = "summary_large_image",

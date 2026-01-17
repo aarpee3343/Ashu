@@ -30,7 +30,6 @@ export async function POST(req: Request) {
           bio,
           image,
           userId: newUser.id,
-          // SAVE VIDEO SETTINGS
           isVideoAvailable: isVideoAvailable || false,
           videoConsultationFee: videoConsultationFee ? Number(videoConsultationFee) : null,
           isVerified: true

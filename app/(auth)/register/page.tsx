@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import toast from "react-hot-toast";
 import Link from "next/link";
@@ -17,6 +17,10 @@ const AppleIcon = () => (
 
 export default function Register() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // 1. Get Return URL
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard/user";
   
   // States
   const [method, setMethod] = useState<"EMAIL" | "PHONE">("EMAIL");
@@ -91,22 +95,24 @@ export default function Register() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      // B. Auto-Login (Direct to Dashboard)
+      // B. Auto-Login (Direct to Dashboard or Return URL)
       const loginResult = await signIn("credentials", {
         redirect: false,
         loginType: method,
         email: method === "EMAIL" ? form.email : undefined,
         password: method === "EMAIL" ? form.password : undefined,
         phone: method === "PHONE" ? form.phone : undefined,
-        otp: "skip", // Skipped because we verified it above locally
+        otp: "skip", 
       });
 
       if (loginResult?.error) {
          toast.error("Account created but login failed. Please log in manually.");
-         router.push("/login");
+         router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
       } else {
          toast.success("Welcome!");
-         router.push("/dashboard/user"); 
+         // 2. Redirect to original page
+         router.push(callbackUrl); 
+         router.refresh();
       }
 
     } catch (error: any) {
@@ -117,7 +123,7 @@ export default function Register() {
   };
 
   const handleSocialLogin = (provider: string) => {
-    signIn(provider, { callbackUrl: "/dashboard/user" });
+    signIn(provider, { callbackUrl });
   };
 
   return (
@@ -170,12 +176,12 @@ export default function Register() {
            {/* Identifier Input (Email or Phone) */}
            <div className="flex gap-2">
              <input 
-                name={method === "EMAIL" ? "email" : "phone"} 
-                type={method === "EMAIL" ? "email" : "tel"}
-                placeholder={method === "EMAIL" ? "Email Address" : "Mobile Number"} 
-                onChange={handleChange} 
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-100 outline-none"
-                disabled={isOtpVerified} // Lock after verification
+               name={method === "EMAIL" ? "email" : "phone"} 
+               type={method === "EMAIL" ? "email" : "tel"}
+               placeholder={method === "EMAIL" ? "Email Address" : "Mobile Number"} 
+               onChange={handleChange} 
+               className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-100 outline-none"
+               disabled={isOtpVerified} // Lock after verification
              />
              {!isOtpSent && !isOtpVerified && (
                <button onClick={handleSendOtp} className="bg-black text-white px-4 rounded-lg text-sm font-bold hover:bg-gray-800 whitespace-nowrap">
@@ -237,8 +243,9 @@ export default function Register() {
            </button>
         </div>
 
+        {/* Pass Callback to Login */}
         <p className="text-center text-sm text-gray-500 mt-6">
-           Already have an account? <Link href="/login" className="text-blue-600 font-bold hover:underline">Log in</Link>
+           Already have an account? <Link href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`} className="text-blue-600 font-bold hover:underline">Log in</Link>
         </p>
       </div>
     </div>

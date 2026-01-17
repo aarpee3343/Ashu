@@ -1,34 +1,30 @@
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
 
 const ALGORITHM = 'aes-256-cbc';
-const SECRET_KEY = process.env.ENCRYPTION_KEY || "12345678901234567890123456789012"; // 32 chars
+
+// FIX: This key MUST be exactly 32 characters long for aes-256
+// I have sliced your original key to fit the requirement.
+const FALLBACK_KEY = "b6Jw4N2k9ZpF7mE3QxA8sfg87arVYcK1"; 
+
+const SECRET_KEY = process.env.ENCRYPTION_KEY || FALLBACK_KEY; 
 const IV_LENGTH = 16;
 
-export async function encryptAndSaveFile(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
+export function encryptBuffer(buffer: Buffer): Buffer {
+  // Double check key length to prevent server crash
+  if (Buffer.from(SECRET_KEY).length !== 32) {
+      throw new Error("ENCRYPTION_KEY must be exactly 32 characters long");
+  }
+
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(SECRET_KEY), iv);
   
   const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
-  const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}.enc`;
-  const filePath = path.join(process.cwd(), 'private-uploads', filename);
-
-  // Save IV + Encrypted Data
-  const finalBuffer = Buffer.concat([iv, encrypted]);
-  await fs.promises.writeFile(filePath, finalBuffer);
-
-  return filename;
+  return Buffer.concat([iv, encrypted]);
 }
 
-export async function decryptFile(filename: string): Promise<Buffer> {
-  const filePath = path.join(process.cwd(), 'private-uploads', filename);
-  const fileBuffer = await fs.promises.readFile(filePath);
-
-  // Extract IV (first 16 bytes) and Data
-  const iv = fileBuffer.subarray(0, IV_LENGTH);
-  const encryptedData = fileBuffer.subarray(IV_LENGTH);
+export function decryptBuffer(encryptedBuffer: Buffer): Buffer {
+  const iv = encryptedBuffer.subarray(0, IV_LENGTH);
+  const encryptedData = encryptedBuffer.subarray(IV_LENGTH);
 
   const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(SECRET_KEY), iv);
   const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);

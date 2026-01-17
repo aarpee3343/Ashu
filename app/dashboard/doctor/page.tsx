@@ -24,13 +24,12 @@ export default async function DoctorDashboard() {
     include: {
       bookings: {
         include: { 
-          user: { include: { vitals: true } }, // User profile
+          user: { include: { vitals: true } }, 
           clinic: true,
           dailyLogs: true 
         },
         orderBy: { date: "desc" },
       },
-      // Note: We only need slots to check what is explicitly blocked manually
       slots: {
         where: { date: { gte: new Date() } },
         orderBy: { date: 'asc' }
@@ -38,7 +37,13 @@ export default async function DoctorDashboard() {
       clinics: true,
       bankAccount: true,
       payouts: true,
-      reviews: true
+      reviews: true,
+      
+      // ✅ ADDED: Rich Profile Data (Crucial for the new Profile Editor)
+      educations: true,
+      awards: true,
+      memberships: true,
+      registrations: true
     },
   });
 

@@ -21,21 +21,21 @@ export default async function UserDashboard() {
     );
   }
 
-  // Fetch full user data
+  // ✅ FIX 1: Look up by ID instead of Email (Safer for Phone logins)
+  // ✅ FIX 2: Added 'user: true' inside bookings to prevent PDF crash
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email! },
+    where: { id: Number((session.user as any).id) },
     include: {
       bookings: {
-        // ✅ ADDED: 'clinic' and 'familyMember' so details show up correctly
         include: { 
             specialist: true, 
             clinic: true,
-            familyMember: true 
+            familyMember: true,
+            user: true // <--- THIS PREVENTS THE PDF CRASH
         },
         orderBy: { date: "desc" },
       },
       vitals: true,
-      // ✅ CRITICAL FIX: Include this so the list appears!
       familyMembers: true, 
     },
   });

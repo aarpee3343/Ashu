@@ -2,86 +2,173 @@
 
 import { useState, useEffect } from "react";
 import { format, addDays, isSameDay } from "date-fns";
-import { X, ChevronLeft, CheckCircle, Loader2, Building2, CreditCard, Banknote } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  CheckCircle,
+  Loader2,
+  Building2,
+  CreditCard,
+  Banknote,
+  UploadCloud
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { generateVideoSlots, generateHomeSlots, generateClinicSlots } from "@/lib/slots";
+import {
+  generateVideoSlots,
+  generateHomeSlots,
+  generateClinicSlots
+} from "@/lib/slots";
 
-export default function BookingWizard({ 
-  isOpen, onClose, specialist, mode, user 
+export default function BookingWizard({
+  isOpen,
+  onClose,
+  specialist,
+  mode,
+  user
 }: any) {
   const router = useRouter();
-  
-  // --- STATE ---
+
+  /* ---------------- STATE ---------------- */
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSlot, setSelectedSlot] = useState("");
-  const [selectedClinicId, setSelectedClinicId] = useState(""); 
+  const [selectedClinicId, setSelectedClinicId] = useState("");
   const [patientId, setPatientId] = useState("SELF");
   const [address, setAddress] = useState("");
   const [homeDays, setHomeDays] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [busySlots, setBusySlots] = useState<string[]>([]); // <--- NEW: Track busy slots
-  
-  // Payment States
+  const [busySlots, setBusySlots] = useState<string[]>([]);
+
+  /* ---- Medical Info ---- */
+  const [medicalCondition, setMedicalCondition] = useState("");
+  const [uploadedDoc, setUploadedDoc] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
+  /* ---- Payment ---- */
   const [paymentMethod, setPaymentMethod] = useState<"ONLINE" | "CASH">("ONLINE");
   const [transactionId, setTransactionId] = useState("");
 
-  // --- INITIALIZATION ---
-  useEffect(() => { 
-    if(isOpen) {
+  /* ---------------- INIT ---------------- */
+  useEffect(() => {
+    if (isOpen) {
       setStep(1);
       setTransactionId("");
       setPaymentMethod("ONLINE");
-      if(mode === 'CLINIC' && specialist.clinics?.length === 1) {
+      setMedicalCondition("");
+      setUploadedDoc("");
+      if (mode === "CLINIC" && specialist.clinics?.length === 1) {
         setSelectedClinicId(specialist.clinics[0].id);
       }
-    } 
+    }
   }, [isOpen, mode, specialist]);
 
-  // --- NEW: FETCH AVAILABILITY WHEN DATE CHANGES ---
+  /* -------- FETCH BUSY SLOTS -------- */
   useEffect(() => {
     const fetchAvailability = async () => {
-        setBusySlots([]); // Reset
-        try {
-            const dateStr = format(selectedDate, "yyyy-MM-dd");
-            const res = await fetch(`/api/slots/availability?specialistId=${specialist.id}&date=${dateStr}`);
-            const data = await res.json();
-            if(data.bookedSlots) {
-                setBusySlots(data.bookedSlots);
-            }
-        } catch (e) {
-            console.error("Failed to check availability");
-        }
+      setBusySlots([]);
+      try {
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        const res = await fetch(
+          `/api/slots/availability?specialistId=${specialist.id}&date=${dateStr}`
+        );
+        const data = await res.json();
+        if (data.bookedSlots) setBusySlots(data.bookedSlots);
+      } catch {
+        console.error("Availability fetch failed");
+      }
     };
     fetchAvailability();
   }, [selectedDate, specialist.id]);
 
-  // Generate Slots based on Mode
-  const allSlots = mode === 'VIDEO' ? generateVideoSlots(selectedDate) 
-                 : mode === 'HOME' ? generateHomeSlots(selectedDate) 
-                 : generateClinicSlots();
+  /* ---------------- DATA ---------------- */
+  const allSlots =
+    mode === "VIDEO"
+      ? generateVideoSlots(selectedDate)
+      : mode === "HOME"
+      ? generateHomeSlots(selectedDate)
+      : generateClinicSlots();
 
   const dateStrip = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
-  const basePrice = mode === 'VIDEO' ? (specialist.videoConsultationFee || specialist.price) : specialist.price;
-  const totalPrice = basePrice * (mode === 'HOME' ? homeDays : 1);
+  const basePrice =
+    mode === "VIDEO"
+      ? specialist.videoConsultationFee || specialist.price
+      : specialist.price;
+  const totalPrice = basePrice * (mode === "HOME" ? homeDays : 1);
 
-  // --- HANDLERS ---
+  /* -------- FILE UPLOAD -------- */
+  const handleFileUpload = async (e: any) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const allowedTypes = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+  ];
+
+  const maxSize = 2 * 1024 * 1024; // 2 MB
+
+  if (!allowedTypes.includes(file.type)) {
+    toast.error("Only PDF or image files are allowed");
+    return;
+  }
+
+  if (file.size > maxSize) {
+    toast.error("File size must be less than 2 MB");
+    return;
+  }
+
+  setIsUploading(true);
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const res = await fetch(`/api/upload?filename=${file.name}`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (data.url) {
+      setUploadedDoc(data.url);
+      toast.success("File uploaded securely");
+    } else {
+      throw new Error();
+    }
+  } catch {
+    toast.error("Upload failed");
+  } finally {
+    setIsUploading(false);
+  }
+};
+
+
+  /* -------- STEP VALIDATION -------- */
   const handleNext = () => {
     if (step === 1) {
-      if (mode === 'CLINIC' && !selectedClinicId) return toast.error("Please select a clinic location");
+      if (mode === "CLINIC" && !selectedClinicId)
+        return toast.error("Please select a clinic");
       if (!selectedSlot) return toast.error("Please select a time slot");
     }
+
     if (step === 2) {
-      if (mode === 'HOME' && !address) return toast.error("Home address is required");
+      if (!medicalCondition || medicalCondition.length < 3)
+        return toast.error("Medical condition is required");
+      if (mode === "HOME" && !address)
+        return toast.error("Home address is required");
     }
+
     setStep(step + 1);
   };
 
+  /* -------- BOOK -------- */
   const handleBook = async () => {
-    if (paymentMethod === "ONLINE" && (!transactionId || transactionId.length < 5)) {
-      return toast.error("Please enter a valid Payment Reference / UTR");
-    }
+    if (paymentMethod === "ONLINE" && transactionId.length < 5)
+      return toast.error("Enter valid UTR");
 
     setLoading(true);
     try {
@@ -94,27 +181,34 @@ export default function BookingWizard({
         locationType: mode,
         visitAddress: address,
         duration: homeDays,
-        clinicId: mode === 'CLINIC' ? Number(selectedClinicId) : null,
+        clinicId: mode === "CLINIC" ? Number(selectedClinicId) : null,
         familyMemberId: patientId === "SELF" ? null : Number(patientId),
-        paymentType: paymentMethod === "ONLINE" ? "UPI_ONLINE" : "PAY_ON_SERVICE",
+        paymentType:
+          paymentMethod === "ONLINE" ? "UPI_ONLINE" : "PAY_ON_SERVICE",
         amountPaid: paymentMethod === "ONLINE" ? totalPrice : 0,
-        transactionId: paymentMethod === "ONLINE" ? transactionId : null
+        transactionId: paymentMethod === "ONLINE" ? transactionId : null,
+        medicalCondition,
+        medicalDocs: uploadedDoc
       };
 
       const res = await fetch("/api/bookings", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Booking failed");
-      
-      toast.success(paymentMethod === "ONLINE" ? "Payment sent for verification!" : "Booking Confirmed!");
+      if (!res.ok) throw new Error("Booking failed");
+
+      toast.success(
+        paymentMethod === "ONLINE"
+          ? "Payment sent for verification!"
+          : "Booking Confirmed!"
+      );
+
       router.push("/dashboard/user");
-      router.refresh(); 
+      router.refresh();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || "Server Error");
+      toast.error(err.message || "Server error");
     } finally {
       setLoading(false);
     }
@@ -122,156 +216,186 @@ export default function BookingWizard({
 
   if (!isOpen) return null;
 
+  /* ================= UI ================= */
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white w-full max-w-md rounded-t-[30px] shadow-2xl h-[85vh] flex flex-col animate-slide-up relative">
-        
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md rounded-t-[30px] h-[85vh] flex flex-col">
         {/* HEADER */}
-        <div className="p-5 border-b flex items-center justify-between bg-white rounded-t-[30px]">
+        <div className="p-5 border-b flex items-center justify-between">
           {step > 1 ? (
-            <button onClick={() => setStep(step - 1)} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft /></button>
-          ) : <div className="w-10" />}
+            <button onClick={() => setStep(step - 1)}>
+              <ChevronLeft />
+            </button>
+          ) : (
+            <div className="w-6" />
+          )}
           <h3 className="font-bold text-lg">
-            {step === 1 && (mode === 'CLINIC' ? "Location & Time" : "Select Slot")}
+            {step === 1 && "Slot & Time"}
             {step === 2 && "Patient Details"}
             {step === 3 && "Payment"}
           </h3>
-          <button onClick={onClose} className="p-2 -mr-2 text-gray-500 hover:bg-gray-100 rounded-full"><X /></button>
+          <button onClick={onClose}>
+            <X />
+          </button>
         </div>
 
         {/* CONTENT */}
-        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
-          
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          {/* STEP 1 */}
           {step === 1 && (
-            <div className="space-y-6">
-              {mode === 'CLINIC' && (
-                 <div>
-                   <p className="text-xs font-bold text-gray-400 uppercase mb-3">Select Clinic</p>
-                   <div className="space-y-2">
-                     {specialist.clinics?.length > 0 ? specialist.clinics.map((c: any) => (
-                       <button key={c.id} onClick={() => setSelectedClinicId(c.id)}
-                         className={`w-full p-4 rounded-xl border text-left flex items-center gap-3 transition-all ${selectedClinicId === c.id ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "border-gray-200"}`}
-                       >
-                         <Building2 className="text-gray-500" />
-                         <div>
-                           <p className="font-bold text-sm">{c.name}</p>
-                           <p className="text-xs text-gray-500">{c.city}, {c.state}</p>
-                         </div>
-                       </button>
-                     )) : <p className="text-sm text-red-500">No clinics found for this doctor.</p>}
-                   </div>
-                 </div>
-              )}
-
-              {/* Date Strip */}
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase mb-3">Select Date</p>
-                <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                   {dateStrip.map((date) => (
-                     <button key={date.toString()} onClick={() => { setSelectedDate(date); setSelectedSlot(""); }} 
-                        className={`flex-shrink-0 w-16 h-20 rounded-2xl flex flex-col items-center justify-center border transition-all ${isSameDay(date, selectedDate) ? "bg-black text-white scale-105" : "border-gray-200"}`}>
-                        <span className="text-xs font-bold">{format(date, "EEE")}</span>
-                        <span className="text-xl font-bold">{format(date, "d")}</span>
-                     </button>
-                   ))}
-                </div>
-              </div>
-
-              {/* Time Slots - NOW WITH BUSY CHECK */}
-              <div>
-                 <p className="text-xs font-bold text-gray-400 uppercase mb-3">Select Time</p>
-                 <div className="grid grid-cols-3 gap-3">
-                   {allSlots.map((slot) => {
-                     // Check if this specific slot string exists in the busySlots array from API
-                     const isBusy = busySlots.includes(slot);
-                     return (
-                       <button 
-                         key={slot} 
-                         onClick={() => !isBusy && setSelectedSlot(slot)} 
-                         disabled={isBusy}
-                         className={`py-3 rounded-xl text-xs font-bold border transition-all relative ${
-                            isBusy ? "bg-gray-100 text-gray-400 cursor-not-allowed border-transparent" : 
-                            selectedSlot === slot ? "bg-blue-600 text-white shadow-md border-blue-600" : "border-gray-200 hover:border-blue-300"
-                         }`}
-                       >
-                         {slot}
-                         {isBusy && <span className="block text-[8px] text-red-400 mt-0.5">BOOKED</span>}
-                       </button>
-                     )
-                   })}
-                 </div>
-                 {allSlots.length === 0 && <p className="text-sm text-gray-400 text-center mt-4">No slots available for this date.</p>}
-              </div>
-            </div>
-          )}
-
-          {/* ... Step 2 and 3 remain exactly same as previous code ... */}
-          {step === 2 && (
-             <div className="space-y-4">
-                <p className="font-bold text-gray-500 text-xs uppercase">Who is this for?</p>
-                <div onClick={() => setPatientId("SELF")} className={`p-4 border rounded-xl flex items-center gap-3 cursor-pointer transition-all ${patientId === "SELF" ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "hover:bg-gray-50"}`}>
-                   <div className="w-8 h-8 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs font-bold">{user.name?.charAt(0)}</div>
-                   <div className="flex-1 font-bold">Myself</div>
-                   {patientId === "SELF" && <CheckCircle className="text-blue-600" size={18} />}
-                </div>
-                {user.familyMembers?.map((m: any) => (
-                   <div key={m.id} onClick={() => setPatientId(String(m.id))} className={`p-4 border rounded-xl flex items-center gap-3 cursor-pointer transition-all ${patientId === String(m.id) ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "hover:bg-gray-50"}`}>
-                      <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold">{m.name.charAt(0)}</div>
-                      <div className="flex-1 font-bold">{m.name} <span className="text-gray-400 font-normal text-xs">({m.relation})</span></div>
-                      {patientId === String(m.id) && <CheckCircle className="text-blue-600" size={18} />}
-                   </div>
-                ))}
-                {mode === 'HOME' && (
-                  <div className="pt-2 animate-fade-in">
-                    <p className="font-bold text-gray-500 text-xs uppercase mb-2">Visit Address</p>
-                    <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter complete address..." className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-black outline-none h-24" />
-                    <div className="mt-4">
-                        <p className="font-bold text-gray-500 text-xs uppercase mb-2">Duration: {homeDays} Day(s)</p>
-                        <input type="range" min="1" max="7" value={homeDays} onChange={(e) => setHomeDays(Number(e.target.value))} className="w-full accent-green-600"/>
+            <>
+              {mode === "CLINIC" &&
+                specialist.clinics?.map((c: any) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedClinicId(c.id)}
+                    className={`w-full p-4 rounded-xl border flex gap-3 ${
+                      selectedClinicId === c.id
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <Building2 />
+                    <div>
+                      <p className="font-bold">{c.name}</p>
+                      <p className="text-xs text-gray-500">{c.city}</p>
                     </div>
-                  </div>
-                )}
-             </div>
+                  </button>
+                ))}
+
+              {/* Date */}
+              <div className="flex gap-3 overflow-x-auto">
+                {dateStrip.map((d) => (
+                  <button
+                    key={d.toString()}
+                    onClick={() => {
+                      setSelectedDate(d);
+                      setSelectedSlot("");
+                    }}
+                    className={`w-16 h-20 rounded-xl ${
+                      isSameDay(d, selectedDate)
+                        ? "bg-black text-white"
+                        : "border"
+                    }`}
+                  >
+                    <div className="text-xs">{format(d, "EEE")}</div>
+                    <div className="text-lg">{format(d, "d")}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Slots */}
+              <div className="grid grid-cols-3 gap-3">
+                {allSlots.map((slot) => {
+                  const isBusy = busySlots.includes(slot);
+                  return (
+                    <button
+                      key={slot}
+                      disabled={isBusy}
+                      onClick={() => !isBusy && setSelectedSlot(slot)}
+                      className={`py-3 rounded-xl text-xs font-bold ${
+                        isBusy
+                          ? "bg-gray-100 text-gray-400"
+                          : selectedSlot === slot
+                          ? "bg-blue-600 text-white"
+                          : "border"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           )}
 
-          {step === 3 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <p className="text-gray-400 text-sm">Total Payable</p>
-                <h1 className="text-4xl font-bold text-gray-900">₹{totalPrice}</h1>
+          {/* STEP 2 */}
+          {step === 2 && (
+            <>
+              <textarea
+                value={medicalCondition}
+                onChange={(e) => setMedicalCondition(e.target.value)}
+                placeholder="Medical condition / reason"
+                className="w-full p-3 border rounded-xl"
+              />
+
+              <div className="border-2 border-dashed rounded-xl p-4 text-center">
+                <UploadCloud className="mx-auto mb-2" />
+                <input type="file" onChange={handleFileUpload} />
+                {isUploading && <p className="text-xs">Uploading...</p>}
+                {uploadedDoc && (
+                  <p className="text-xs text-green-600">
+                    File attached securely
+                  </p>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setPaymentMethod("ONLINE")} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === "ONLINE" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-100 text-gray-500"}`}>
-                  <CreditCard size={24} /><span className="font-bold text-sm">Pay Now</span>
-                </button>
-                <button onClick={() => mode !== 'VIDEO' && setPaymentMethod("CASH")} disabled={mode === 'VIDEO'} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${mode === 'VIDEO' ? "opacity-40 cursor-not-allowed bg-gray-50" : paymentMethod === "CASH" ? "border-green-600 bg-green-50 text-green-700" : "border-gray-100 text-gray-500"}`}>
-                  <Banknote size={24} /><span className="font-bold text-sm">Pay Later</span>
-                  {mode === 'VIDEO' && <span className="text-[9px] text-red-500 font-bold">Prepaid Only</span>}
-                </button>
-              </div>
-              {paymentMethod === "ONLINE" ? (
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center animate-fade-in">
-                   <p className="text-xs font-bold text-blue-600 uppercase mb-3">Scan UPI QR</p>
-                   <div className="w-32 h-32 bg-white mx-auto p-2 rounded-lg mb-4 border border-dashed border-gray-300">
-                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=care@revivehub.co.in&pn=ReviveHub&am=${totalPrice}&cu=INR`} alt="QR" className="w-full h-full object-contain" />
-                   </div>
-                   <input value={transactionId} onChange={(e) => setTransactionId(e.target.value)} placeholder="Enter UTR / Ref No." className="w-full p-3 border rounded-xl text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-600 outline-none" maxLength={12} />
-                </div>
-              ) : (
-                <div className="bg-green-50 p-6 rounded-xl border border-green-100 text-center animate-fade-in">
-                   <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2"><CheckCircle size={24} /></div>
-                   <h3 className="font-bold text-green-800">Pay at Service</h3>
-                   <p className="text-xs text-green-600 mt-1">Please pay ₹{totalPrice} directly to the doctor via Cash or UPI.</p>
-                </div>
+
+              {mode === "HOME" && (
+                <>
+                  <textarea
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Home address"
+                    className="w-full p-3 border rounded-xl"
+                  />
+                  <input
+                    type="range"
+                    min={1}
+                    max={7}
+                    value={homeDays}
+                    onChange={(e) => setHomeDays(Number(e.target.value))}
+                  />
+                </>
               )}
-            </div>
+            </>
+          )}
+
+          {/* STEP 3 */}
+          {step === 3 && (
+            <>
+              <h1 className="text-3xl font-bold text-center">₹{totalPrice}</h1>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setPaymentMethod("ONLINE")}
+                  className={`p-4 border rounded-xl ${
+                    paymentMethod === "ONLINE" && "border-blue-600"
+                  }`}
+                >
+                  <CreditCard /> Pay Now
+                </button>
+                <button
+                  disabled={mode === "VIDEO"}
+                  onClick={() => setPaymentMethod("CASH")}
+                  className={`p-4 border rounded-xl ${
+                    paymentMethod === "CASH" && "border-green-600"
+                  }`}
+                >
+                  <Banknote /> Pay Later
+                </button>
+              </div>
+
+              {paymentMethod === "ONLINE" && (
+                <input
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  placeholder="Enter UTR"
+                  className="w-full p-3 border rounded-xl text-center"
+                />
+              )}
+            </>
           )}
         </div>
 
-        <div className="p-5 border-t bg-white">
-           <button onClick={step < 3 ? handleNext : handleBook} disabled={loading} className="w-full py-4 bg-black text-white font-bold rounded-xl text-lg hover:scale-[1.01] transition-transform flex items-center justify-center gap-2">
-             {loading ? <Loader2 className="animate-spin" /> : (step < 3 ? "Continue" : (paymentMethod === "ONLINE" ? "Verify & Book" : "Confirm Booking"))}
-           </button>
+        {/* FOOTER */}
+        <div className="p-5 border-t">
+          <button
+            onClick={step < 3 ? handleNext : handleBook}
+            disabled={loading}
+            className="w-full py-4 bg-black text-white rounded-xl"
+          >
+            {loading ? <Loader2 className="animate-spin mx-auto" /> : step < 3 ? "Continue" : "Confirm Booking"}
+          </button>
         </div>
       </div>
     </div>

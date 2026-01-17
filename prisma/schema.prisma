@@ -74,8 +74,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- EXISTING MODELS BELOW (Unchanged) ---
-
 // 5. Specialist Model
 model Specialist {
   id                   Int      @id @default(autoincrement())
@@ -106,6 +104,51 @@ model Specialist {
   bookings Booking[]
   clinics  Clinic[]
   reviews  Review[]
+  educations    Education[]
+  awards        Award[]
+  languages     SpecialistLanguage[]
+  registrations Registration[]
+  memberships   Membership[]
+}
+
+model Education {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  degree       String     // e.g., "BPTh/BPT"
+  college      String     // e.g., "KEM Hospital, Mumbai"
+  year         String     // e.g., "2015"
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+}
+
+model Award {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  name         String     // e.g., "Best Physiotherapist 2024"
+  year         String
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+}
+
+model SpecialistLanguage {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  language     String     // e.g., "English", "Hindi"
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+}
+
+model Registration {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  number       String     // e.g., "2015/05/1234"
+  council      String     // e.g., "Maharashtra Council of OT/PT"
+  year         String
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
+}
+
+model Membership {
+  id           Int        @id @default(autoincrement())
+  specialistId Int
+  name         String     // e.g., "Indian Association of Physiotherapists (IAP)"
+  specialist   Specialist @relation(fields: [specialistId], references: [id])
 }
 
 // 6. Clinic Model

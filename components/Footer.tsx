@@ -105,7 +105,7 @@ export default function Footer() {
             <Mail size={18} className="text-blue-400" />
             <div>
               <p className="text-sm">Email us</p>
-              <p className="font-semibold">support@revivehub.com</p>
+              <p className="font-semibold">support@revivehub.co.in</p>
             </div>
           </div>
           <div className="flex items-center gap-3 text-gray-300">

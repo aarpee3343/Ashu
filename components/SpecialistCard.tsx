@@ -1,14 +1,32 @@
+'use client'; 
+
 import Link from "next/link";
 import Image from "next/image";
+import { useState, useEffect, useMemo } from "react";
 
 // FIX: Accept both 'specialist' AND 'data' props to prevent errors
 export default function SpecialistCard({ specialist, data, defaultMode = "CLINIC" }: any) {
   
   // 1. Safety Check: Use whichever prop is provided
   const doctor = specialist || data;
+  const [imgSrc, setImgSrc] = useState("/icon.png");
 
+  useEffect(() => {
+    if (doctor?.image) {
+      setImgSrc(doctor.image);
+    }
+  }, [doctor]);
+
+  if (!doctor) return null;
   // 2. If data is still missing, don't crash (render nothing or a skeleton)
   if (!doctor) return null;
+
+  // State to handle image loading errors
+  const [imageError, setImageError] = useState(false);
+
+  const handleImageError = () => {
+    setImageError(true); // Fallback to the default logo if image fails to load
+  };
 
   return (
     <div className="group bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl transition-all flex flex-col items-center text-center relative overflow-hidden">
@@ -22,11 +40,12 @@ export default function SpecialistCard({ specialist, data, defaultMode = "CLINIC
 
       <div className="relative mb-4" style={{ width: "120px", height: "120px" }}>
         <Image
-          src={doctor.image || "/default-avatar.png"} // Fallback image safety
+          src={imgSrc}
           alt={doctor.name}
           fill
-          className="rounded-full object-cover border-4 border-blue-50"
+          className="rounded-full object-cover border-4 border-blue-50 group-hover:border-blue-100 transition-colors"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          onError={() => setImgSrc("/icon-r.png")} // Robust fallback
         />
       </div>
 
