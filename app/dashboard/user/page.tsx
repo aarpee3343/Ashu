@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import UserDashboardClient from "./UserDashboardClient";
 import Link from "next/link";
 
@@ -21,8 +20,6 @@ export default async function UserDashboard() {
     );
   }
 
-  // ✅ FIX 1: Look up by ID instead of Email (Safer for Phone logins)
-  // ✅ FIX 2: Added 'user: true' inside bookings to prevent PDF crash
   const user = await prisma.user.findUnique({
     where: { id: Number((session.user as any).id) },
     include: {
@@ -31,18 +28,22 @@ export default async function UserDashboard() {
             specialist: true, 
             clinic: true,
             familyMember: true,
-            user: true // <--- THIS PREVENTS THE PDF CRASH
+            user: true,
+            review: true, // ✅ ADDED: Check if review exists for this booking
+            dailyLogs: true
         },
         orderBy: { date: "desc" },
       },
       vitals: true,
-      familyMembers: true, 
+      familyMembers: true,
+      reviews: {
+        include: { specialist: true },
+        orderBy: { createdAt: 'desc' }
+      }
     },
   });
 
-  if (!user) {
-    return <div className="p-10 text-center">User not found. Please contact support.</div>;
-  }
+  if (!user) return <div className="p-10 text-center">User not found.</div>;
 
   return <UserDashboardClient user={user} />;
 }

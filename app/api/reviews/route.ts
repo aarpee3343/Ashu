@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+// POST: Create Review (Already exists, keep it)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -17,7 +18,6 @@ export async function POST(req: Request) {
         userId: Number(userId),
         specialistId: Number(specialistId),
         status: "COMPLETED",
-        // Check if Paid Amount covers Total Price
         amountPaid: {
             gte: prisma.booking.fields.totalPrice
         }
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
         comment: comment,
         userId: Number(userId),
         specialistId: Number(specialistId),
-        bookingId: validBooking.id // Link to specific booking proof
+        bookingId: validBooking.id
       }
     });
 
@@ -54,5 +54,25 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Review creation failed:", error);
     return NextResponse.json({ error: "Failed to submit review" }, { status: 500 });
+  }
+}
+
+// NEW: PATCH Method to Edit Reviews
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json();
+    const { reviewId, rating, comment } = body;
+
+    const updatedReview = await prisma.review.update({
+      where: { id: reviewId },
+      data: {
+        rating: Number(rating),
+        comment: comment,
+      }
+    });
+
+    return NextResponse.json(updatedReview);
+  } catch (error) {
+    return NextResponse.json({ error: "Update failed" }, { status: 500 });
   }
 }

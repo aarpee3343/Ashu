@@ -11,7 +11,7 @@ import Link from "next/link";
 import { 
   Video, MapPin, Clock, CreditCard, FileText, CheckCircle, X, 
   UploadCloud, CalendarCheck, IndianRupee, Plus, Trash2, ShieldCheck, 
-  AlertCircle, Building2, Wallet, DollarSign, Banknote
+  AlertCircle, Building2, Wallet, DollarSign, Banknote, Star, MessageSquare
 } from "lucide-react";
 
 const ALL_TIMES = [
@@ -417,6 +417,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
            {[
              { id: "APPOINTMENTS", label: "Appointments" },
              { id: "SLOTS", label: "Schedule" },
+             { id: "REVIEWS", label: "Reviews" },
              { id: "FINANCIALS", label: "Earnings" },
              { id: "PROFILE", label: "Settings" }
            ].map(tab => (
@@ -458,7 +459,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
                      {b.duration > 1 && (
                         <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded flex items-center gap-1"><CalendarCheck size={12}/> {b.duration} Day Plan</span>
                      )}
-                     
+                    
                      {/* Payment Status Badge */}
                      <span className={`flex items-center gap-1 px-2 py-1 rounded ${b.amountPaid >= b.totalPrice ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         <IndianRupee size={12} /> {b.amountPaid >= b.totalPrice ? 'PAID FULL' : `DUE: ₹${b.totalPrice - b.amountPaid}`}
@@ -570,7 +571,38 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* --- TAB 3: FINANCIALS (UPDATED with Payout) --- */}
+        {/* --- TAB 3: REVIEWS --- */}
+        {activeTab === "REVIEWS" && (
+          <div className="space-y-4">
+             {specialist.reviews.length === 0 ? (
+                <div className="text-center py-10 bg-white rounded-3xl border border-gray-100">
+                   <p className="text-gray-400">No reviews yet.</p>
+                </div>
+             ) : (
+                specialist.reviews.map((r: any) => (
+                   <div key={r.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                      <div className="flex justify-between items-start mb-3">
+                         <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
+                               {r.user?.name?.[0] || "A"}
+                            </div>
+                            <div>
+                               <p className="font-bold text-gray-900">{r.user?.name || "Anonymous"}</p>
+                               <p className="text-xs text-gray-500">{format(new Date(r.createdAt), "dd MMM yyyy")}</p>
+                            </div>
+                         </div>
+                         <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                            {r.rating} <Star size={10} fill="currentColor" />
+                         </div>
+                      </div>
+                      <p className="text-gray-600 text-sm leading-relaxed">"{r.comment}"</p>
+                   </div>
+                ))
+             )}
+          </div>
+        )}
+
+        {/* --- TAB 4: FINANCIALS (UPDATED with Payout) --- */}
         {activeTab === "FINANCIALS" && (
           <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -586,7 +618,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
                     <p className="text-xs text-gray-500 uppercase font-bold mb-1">Online Paid</p>
                     <p className="font-bold text-2xl text-blue-600">₹{onlineCollected}</p>
                  </div>
-                 <div className="bg-black text-white p-6 border border-black rounded-2xl shadow-lg">
+                 <div className="black text-white p-6 border border-black rounded-2xl shadow-lg">
                     <p className="text-xs text-gray-400 uppercase font-bold mb-1">Payout Pending</p>
                     <div className="flex justify-between items-center">
                       <p className="font-bold text-2xl text-green-400">₹{payoutEligibleAmount}</p>
@@ -623,7 +655,7 @@ export default function DoctorDashboardClient({ specialist }: any) {
           </div>
         )}
 
-        {/* --- TAB 4: PROFILE SETTINGS - ENHANCED --- */}
+        {/* --- TAB 5: PROFILE SETTINGS - ENHANCED --- */}
         {activeTab === "PROFILE" && (
            <div className="space-y-8 max-w-4xl mx-auto">
               
@@ -962,107 +994,107 @@ export default function DoctorDashboardClient({ specialist }: any) {
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
          <div className="bg-white p-8 rounded-xl w-full max-w-2xl h-[90vh] flex flex-col relative animate-slide-up shadow-2xl">
                
-               {/* Header */}
-               <div className="flex justify-between items-center mb-6 border-b pb-4">
-                  <div>
-                     <h3 className="font-bold text-2xl text-gray-800">Prescription</h3>
-                     <p className="text-sm text-gray-500">Generate official prescription for {selectedBooking.user?.name}</p>
-                  </div>
-                  <AsyncButton 
-                     onClick={() => setCompleteModalOpen(false)} 
-                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                     <X size={24} className="text-gray-600"/>
-                  </AsyncButton>
-               </div>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-6 border-b pb-4">
+                 <div>
+                    <h3 className="font-bold text-2xl text-gray-800">Prescription</h3>
+                    <p className="text-sm text-gray-500">Generate official prescription for {selectedBooking.user?.name}</p>
+                 </div>
+                 <AsyncButton 
+                    onClick={() => setCompleteModalOpen(false)} 
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                 >
+                    <X size={24} className="text-gray-600"/>
+                 </AsyncButton>
+              </div>
                
-               {/* Scrollable Form Area */}
-               <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-                  
-                  {/* Diagnosis */}
-                  <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Diagnosis / Clinical Findings</label>
-                     <input 
-                           className="w-full p-4 border border-gray-200 rounded-lg font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
-                           placeholder="e.g. Viral Fever, Acute Back Pain" 
-                           value={rxForm.diagnosis || ''}
-                           onChange={e => setRxForm({...rxForm, diagnosis: e.target.value})} 
-                     />
-                  </div>
+              {/* Scrollable Form Area */}
+              <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                 
+                 {/* Diagnosis */}
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Diagnosis / Clinical Findings</label>
+                    <input 
+                          className="w-full p-4 border border-gray-200 rounded-lg font-medium focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                          placeholder="e.g. Viral Fever, Acute Back Pain" 
+                          value={rxForm.diagnosis || ''}
+                          onChange={e => setRxForm({...rxForm, diagnosis: e.target.value})} 
+                    />
+                 </div>
 
-                  {/* Medicines */}
-                  <div>
-                     <div className="flex justify-between mb-2">
-                           <label className="block text-xs font-bold text-gray-500 uppercase">Medicines (Rx)</label>
-                           <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded border">Format: Name | Dosage | Duration</span>
-                     </div>
-                     <textarea 
-                           className="w-full p-4 border border-gray-200 rounded-lg h-40 font-mono text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
-                           placeholder="Paracetamol 650mg | 1 tab after food | 3 Days&#10;Amoxicillin 500mg | 1 tab twice daily | 5 Days" 
-                           value={rxForm.medicines || ''}
-                           onChange={e => setRxForm({...rxForm, medicines: e.target.value})} 
-                     />
-                  </div>
+                 {/* Medicines */}
+                 <div>
+                    <div className="flex justify-between mb-2">
+                          <label className="block text-xs font-bold text-gray-500 uppercase">Medicines (Rx)</label>
+                          <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded border">Format: Name | Dosage | Duration</span>
+                    </div>
+                    <textarea 
+                          className="w-full p-4 border border-gray-200 rounded-lg h-40 font-mono text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                          placeholder="Paracetamol 650mg | 1 tab after food | 3 Days&#10;Amoxicillin 500mg | 1 tab twice daily | 5 Days" 
+                          value={rxForm.medicines || ''}
+                          onChange={e => setRxForm({...rxForm, medicines: e.target.value})} 
+                    />
+                 </div>
 
-                  {/* Advice */}
-                  <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Advice / Instructions</label>
-                     <textarea 
-                           className="w-full p-4 border border-gray-200 rounded-lg h-32 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
-                           placeholder="- Drink plenty of warm water&#10;- Complete blood test (CBC)&#10;- Review after 3 days" 
-                           value={rxForm.advice || ''}
-                           onChange={e => setRxForm({...rxForm, advice: e.target.value})} 
-                     />
-                  </div>
+                 {/* Advice */}
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Advice / Instructions</label>
+                    <textarea 
+                          className="w-full p-4 border border-gray-200 rounded-lg h-32 focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all" 
+                          placeholder="- Drink plenty of warm water&#10;- Complete blood test (CBC)&#10;- Review after 3 days" 
+                          value={rxForm.advice || ''}
+                          onChange={e => setRxForm({...rxForm, advice: e.target.value})} 
+                    />
+                 </div>
 
-                  {/* File Upload Section */}
-                  <div className="border border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                     <div className="flex flex-col items-center justify-center text-center">
-                           {uploadedRxUrl ? (
-                              <div className="text-green-600 flex flex-col items-center">
-                                 <CheckCircle size={32} className="mb-2"/>
-                                 <p className="font-medium">File Attached Successfully</p>
-                                 <p className="text-xs text-gray-500 mt-1">Ready to be included in report</p>
-                              </div>
-                           ) : (
-                              <>
-                                 <UploadCloud className="text-gray-400 mb-3" size={32} />
-                                 <p className="text-sm font-medium text-gray-700">Upload Handwritten Note (Optional)</p>
-                                 <p className="text-xs text-gray-400 mb-4">PDF or Images only</p>
-                                 <input 
-                                       type="file" 
-                                       accept="application/pdf, image/*" 
-                                       onChange={handleUpload} 
-                                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer" 
-                                 />
-                                 {isUploading && <p className="text-xs text-blue-600 mt-3 animate-pulse font-medium">Uploading...</p>}
-                              </>
-                           )}
-                     </div>
-                  </div>
+                 {/* File Upload Section */}
+                 <div className="border border-dashed border-gray-300 rounded-lg p-6 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                    <div className="flex flex-col items-center justify-center text-center">
+                          {uploadedRxUrl ? (
+                             <div className="text-green-600 flex flex-col items-center">
+                                <CheckCircle size={32} className="mb-2"/>
+                                <p className="font-medium">File Attached Successfully</p>
+                                <p className="text-xs text-gray-500 mt-1">Ready to be included in report</p>
+                             </div>
+                          ) : (
+                             <>
+                                <UploadCloud className="text-gray-400 mb-3" size={32} />
+                                <p className="text-sm font-medium text-gray-700">Upload Handwritten Note (Optional)</p>
+                                <p className="text-xs text-gray-400 mb-4">PDF or Images only</p>
+                                <input 
+                                      type="file" 
+                                      accept="application/pdf, image/*" 
+                                      onChange={handleUpload} 
+                                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer" 
+                                />
+                                {isUploading && <p className="text-xs text-blue-600 mt-3 animate-pulse font-medium">Uploading...</p>}
+                             </>
+                          )}
+                    </div>
+                 </div>
 
-                  {/* Payment Check (Conditional) */}
-                  {selectedBooking.duration === 1 && selectedBooking.paymentType === 'PAY_ON_SERVICE' && (
-                     <label className="flex items-center gap-4 p-4 border border-yellow-200 bg-yellow-50 rounded-lg cursor-pointer select-none">
-                           <input type="checkbox" className="w-5 h-5 accent-black rounded" onChange={(e) => setCashCollectedCheck(e.target.checked)} />
-                           <div>
-                              <p className="font-bold text-sm text-yellow-900">Confirm Cash Payment</p>
-                              <p className="text-xs text-yellow-700">Collect ₹{selectedBooking.totalPrice} from patient</p>
-                           </div>
-                     </label>
-                  )}
-               </div>
+                 {/* Payment Check (Conditional) */}
+                 {selectedBooking.duration === 1 && selectedBooking.paymentType === 'PAY_ON_SERVICE' && (
+                    <label className="flex items-center gap-4 p-4 border border-yellow-200 bg-yellow-50 rounded-lg cursor-pointer select-none">
+                          <input type="checkbox" className="w-5 h-5 accent-black rounded" onChange={(e) => setCashCollectedCheck(e.target.checked)} />
+                          <div>
+                             <p className="font-bold text-sm text-yellow-900">Confirm Cash Payment</p>
+                             <p className="text-xs text-yellow-700">Collect ₹{selectedBooking.totalPrice} from patient</p>
+                          </div>
+                    </label>
+                 )}
+              </div>
 
-               {/* Footer Action */}
-               <div className="pt-4 border-t mt-4">
-                  <AsyncButton 
-                     onClick={completeBooking} 
-                     className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-900 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform active:scale-[0.99]"
-                  >
-                     <FileText size={20} />
-                     Generate Prescription & Complete
-                  </AsyncButton>
-               </div>
+              {/* Footer Action */}
+              <div className="pt-4 border-t mt-4">
+                 <AsyncButton 
+                    onClick={completeBooking} 
+                    className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-900 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform active:scale-[0.99]"
+                 >
+                    <FileText size={20} />
+                    Generate Prescription & Complete
+                 </AsyncButton>
+              </div>
          </div>
       </div>
    )}

@@ -25,7 +25,7 @@ export default async function AdminDashboard() {
         <StatCard title="Total Doctors" value={totalDoctors} icon="👨‍⚕️" color="blue" />
         <StatCard title="Total Patients" value={totalUsers} icon="👥" color="green" />
         <StatCard title="Appointments" value={totalBookings} icon="📅" color="purple" />
-        <StatCard title="Total Revenue" value={`₹${revenue._sum.totalPrice || 0}`} icon="💰" color="yellow" />
+        <StatCard title="Total Revenue" value={`₹${revenue._sum.totalPrice?.toLocaleString() || 0}`} icon="💰" color="yellow" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

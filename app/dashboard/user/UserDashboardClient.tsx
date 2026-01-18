@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { 
-  User, AtSign, Phone, MapPin, Calendar, CreditCard, Users, 
-  FileText, Clock, Eye, Download, Activity, X, Plus, Save, 
-  ChevronRight, CheckCircle, Loader2, AlertTriangle
+  User, Calendar, CreditCard, FileText, Clock, Eye, Download, Activity, X, 
+  ChevronRight, CheckCircle, Loader2, AlertTriangle, Star, MessageSquare, 
+  MapPin, Phone, Users, AtSign, Plus, Save, Edit2, AlertCircle
 } from 'lucide-react';
 import { format } from "date-fns";
 import toast from "react-hot-toast";
@@ -12,13 +12,13 @@ import { useRouter } from "next/navigation";
 import AsyncButton from "@/components/ui/AsyncButton";
 import { generatePrescriptionPDF } from "@/lib/pdfGenerator";
 
+// Invoice Helper (Dynamic Import)
 const generateInvoice = async (data: any) => {
   try {
-    // Dynamically import the invoice generator
     const { generateInvoice } = await import('@/components/InvoiceGenerator');
     await generateInvoice(data);
   } catch (error) {
-    console.error('Error generating invoice:', error);
+    console.error(error);
     toast.error('Failed to generate invoice');
   }
 };
@@ -27,29 +27,21 @@ export default function UserDashboardClient({ user }: any) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("APPOINTMENTS");
   
-  // Modal States
-  const [selectedBooking, setSelectedBooking] = useState<any>(null); // Details
-  const [payModalData, setPayModalData] = useState<any>(null); // Pay Balance
+  // Modals
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [payModalData, setPayModalData] = useState<any>(null);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [editingReview, setEditingReview] = useState<any>(null); // For editing existing reviews
+  const [writeReviewData, setWriteReviewData] = useState<any>(null); // ✅ NEW: Review Modal State
 
-  // Data States
+  // Review Form Data
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
+
+  const [loading, setLoading] = useState(false);
   const [familyMembers, setFamilyMembers] = useState(user.familyMembers || []);
   const [vitals, setVitals] = useState(user.vitals?.[0] || {}); 
-
-  const formatDoctorName = (name: string) => {
-  if (!name) return '';
   
-  const trimmedName = name.trim();
-  
-  // Remove any existing Dr. prefixes (case-insensitive)
-  const cleanedName = trimmedName.replace(/^(Dr\.?\s*)/i, '');
-  
-  // Add Dr. prefix to cleaned name
-  return `Dr. ${cleanedName}`;
-};
-  
-  // Forms
+  // Simple Profile Form (Existing)
   const [profileData, setProfileData] = useState({ 
     phone: user.phone || "", age: user.age || "", gender: user.gender || "Male", address: user.address || "" 
   });
@@ -64,23 +56,72 @@ export default function UserDashboardClient({ user }: any) {
   const [utrInput, setUtrInput] = useState("");
 
   // --- SYNC EFFECTS ---
-  // Ensure family list updates if server data changes
   useEffect(() => {
     if (user.familyMembers) {
       setFamilyMembers(user.familyMembers);
     }
   }, [user.familyMembers]);
 
-  // Polling for status updates (e.g. Doctor completes appointment)
   useEffect(() => {
     const interval = setInterval(() => {
        router.refresh();
-    }, 10000); // Check every 10 seconds
+    }, 10000);
     return () => clearInterval(interval);
   }, [router]);
 
+  // Helpers
+  const formatDoctorName = (name: string) => `Dr. ${name?.replace(/^(Dr\.?\s*)/i, '') || ''}`;
+
   // --- ACTIONS ---
 
+  // ✅ NEW: Submit Review Handler
+  const handleSubmitReview = async () => {
+    if (!reviewForm.comment) return toast.error("Please write a comment");
+    setLoading(true);
+    
+    const res = await fetch("/api/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+            userId: user.id,
+            specialistId: writeReviewData.specialistId,
+            bookingId: writeReviewData.id,
+            rating: reviewForm.rating,
+            comment: reviewForm.comment
+        })
+    });
+
+    const data = await res.json();
+    setLoading(false);
+
+    if (res.ok) {
+        toast.success("Review Submitted!");
+        setWriteReviewData(null); // Close modal
+        setReviewForm({ rating: 5, comment: "" }); // Reset form
+        router.refresh();
+    } else {
+        toast.error(data.error || "Failed to submit");
+    }
+  };
+
+  // ✅ NEW: Update Review Handler
+  const handleUpdateReview = async () => {
+    if(!editingReview) return;
+    setLoading(true);
+    await fetch("/api/reviews", {
+        method: "PATCH",
+        body: JSON.stringify({
+            reviewId: editingReview.id,
+            rating: editingReview.rating,
+            comment: editingReview.comment
+        })
+    });
+    toast.success("Review Updated");
+    setEditingReview(null);
+    router.refresh();
+    setLoading(false);
+  };
+
+  // Existing handlers
   const handleUpdateProfile = async () => {
     setLoading(true);
     await fetch("/api/user/profile", { method: "PATCH", body: JSON.stringify(profileData) });
@@ -133,8 +174,6 @@ export default function UserDashboardClient({ user }: any) {
     if(utrInput.length < 5) return toast.error("Invalid UTR");
     setLoading(true);
     
-    // Simulate API call to update payment
-    // In a real app, you would hit an endpoint that verifies this UTR
     await fetch(`/api/bookings/${payModalData.id}`, {
         method: "PATCH",
         body: JSON.stringify({ action: "PAY_BALANCE", transactionId: utrInput })
@@ -162,6 +201,7 @@ export default function UserDashboardClient({ user }: any) {
             { id: "APPOINTMENTS", icon: Calendar, label: "Bookings" },
             { id: "FINANCE", icon: CreditCard, label: "Payments" },
             { id: "RECORDS", icon: FileText, label: "Records" },
+            { id: "REVIEWS", icon: MessageSquare, label: "My Reviews" },
             { id: "PROFILE", icon: User, label: "Profile" },
           ].map((tab) => (
             <AsyncButton key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -185,6 +225,9 @@ export default function UserDashboardClient({ user }: any) {
               const isOngoing = b.dailyLogs?.some((l: any) => l.status === 'COMPLETED') && b.status !== 'COMPLETED';
               const displayStatus = isOngoing ? 'ONGOING' : b.status;
               
+              // ✅ Check Eligibility for Review
+              const canReview = b.status === 'COMPLETED' && b.amountPaid >= b.totalPrice && !b.review;
+
               return (
               <div key={b.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative">
                 <div className={`absolute top-3 right-3 px-2 py-0.5 text-[10px] font-bold rounded ${
@@ -193,6 +236,7 @@ export default function UserDashboardClient({ user }: any) {
                   displayStatus === 'COMPLETED' ? 'bg-green-100 text-green-700' : 
                   'bg-gray-100 text-gray-700'
                 }`}>{displayStatus}</div>
+                
                 <div className="flex gap-4">
                   <div className="bg-gray-100 w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold text-gray-600">
                     <span className="text-lg">{format(new Date(b.date), "d")}</span>
@@ -206,10 +250,21 @@ export default function UserDashboardClient({ user }: any) {
                     </AsyncButton>
                   </div>
                 </div>
-                {/* Action Buttons */}
+
+                {/* ✅ Action Buttons (Including Write Review) */}
                 <div className="mt-4 flex gap-2">
                    {b.locationType === 'VIDEO' && b.status === 'UPCOMING' && (
-                     <a href={`/room/${b.id}`} className="flex-1 bg-purple-600 text-white text-center py-2 rounded-lg text-sm font-bold shadow-lg shadow-purple-100">Join Call</a>
+                      <a href={`/room/${b.id}`} className="flex-1 bg-purple-600 text-white text-center py-2 rounded-lg text-sm font-bold shadow-lg shadow-purple-100">Join Call</a>
+                   )}
+                   
+                   {/* SHOW REVIEW BUTTON ONLY IF ELIGIBLE */}
+                   {canReview && (
+                      <AsyncButton 
+                        onClick={() => setWriteReviewData(b)}
+                        className="flex-1 bg-yellow-400 text-black text-center py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Star size={16} /> Write Review
+                      </AsyncButton>
                    )}
                 </div>
               </div>
@@ -270,7 +325,34 @@ export default function UserDashboardClient({ user }: any) {
             </div>
         )}
 
-        {/* --- 3. RECORDS TAB --- */}
+        {/* --- 3. REVIEWS TAB (View Your Past Reviews) --- */}
+        {activeTab === "REVIEWS" && (
+           <div className="space-y-4">
+              {user.reviews.length === 0 && <p className="text-center text-gray-400 mt-10">You haven't written any reviews yet.</p>}
+              {user.reviews.map((r: any) => (
+                 <div key={r.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                       <div>
+                          <h3 className="font-bold text-gray-900">{formatDoctorName(r.specialist.name)}</h3>
+                          <p className="text-xs text-gray-500">{format(new Date(r.createdAt), "dd MMM yyyy")}</p>
+                       </div>
+                       <div className="flex items-center gap-2">
+                         <div className="flex gap-1 text-yellow-400">
+                            <span className="font-bold text-black text-sm mr-1">{r.rating}</span>
+                            <Star size={16} fill="currentColor" />
+                         </div>
+                         <AsyncButton onClick={() => setEditingReview(r)} className="text-blue-600 bg-blue-50 p-2 rounded-full">
+                            <Edit2 size={14} />
+                         </AsyncButton>
+                       </div>
+                    </div>
+                    <p className="text-sm text-gray-600 italic">"{r.comment}"</p>
+                 </div>
+              ))}
+           </div>
+        )}
+
+        {/* --- 4. RECORDS TAB --- */}
         {activeTab === "RECORDS" && (
            <div className="space-y-3">
               {user.bookings.filter((b: any) => b.prescription || b.medicalDocs).length === 0 && <p className="text-center text-gray-400 mt-10">No records found</p>}
@@ -290,7 +372,7 @@ export default function UserDashboardClient({ user }: any) {
            </div>
         )}
 
-        {/* --- 4. PROFILE TAB --- */}
+        {/* --- 5. PROFILE TAB --- */}
         {activeTab === "PROFILE" && (
            <div className="space-y-6">
               
@@ -380,7 +462,6 @@ export default function UserDashboardClient({ user }: any) {
                <div className="space-y-4 text-sm">
                <div className="flex justify-between py-2 border-b">
                   <span className="text-gray-500">Doctor</span>
-                  {/* FIXED: Use selectedBooking instead of b */}
                   <span className="font-bold">{formatDoctorName(selectedBooking.specialist.name)}</span>
                </div>
                
@@ -482,6 +563,66 @@ export default function UserDashboardClient({ user }: any) {
                <AsyncButton onClick={() => setShowFamilyModal(false)} className="w-full text-center py-3 text-gray-500 mt-2">Cancel</AsyncButton>
             </div>
          </div>
+      )}
+
+      {/* --- MODAL: WRITE REVIEW --- */}
+      {writeReviewData && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative">
+              <AsyncButton onClick={() => setWriteReviewData(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></AsyncButton>
+              
+              <h3 className="font-bold text-xl mb-1">Rate Experience</h3>
+              <p className="text-sm text-gray-500 mb-6">How was your appointment with <strong>{formatDoctorName(writeReviewData.specialist.name)}</strong>?</p>
+              
+              <div className="flex justify-center gap-2 mb-6">
+                 {[1, 2, 3, 4, 5].map((star) => (
+                    <AsyncButton key={star} onClick={() => setReviewForm({ ...reviewForm, rating: star })} className="transition-transform hover:scale-110">
+                       <Star size={32} className={star <= reviewForm.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"} />
+                    </AsyncButton>
+                 ))}
+              </div>
+              
+              <textarea 
+                 value={reviewForm.comment} 
+                 onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                 className="w-full p-3 border rounded-xl h-24 mb-4 focus:ring-2 focus:ring-yellow-400 outline-none"
+                 placeholder="Share your feedback..."
+              />
+              
+              <AsyncButton onClick={handleSubmitReview} disabled={loading} className="w-full bg-black text-white py-3 rounded-xl font-bold">
+                 {loading ? "Submitting..." : "Submit Review"}
+              </AsyncButton>
+           </div>
+        </div>
+      )}
+
+      {/* --- MODAL: EDIT REVIEW --- */}
+      {editingReview && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative">
+              <AsyncButton onClick={() => setEditingReview(null)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={20} /></AsyncButton>
+              <h3 className="font-bold text-xl mb-4">Edit Review</h3>
+              
+              <div className="flex gap-2 mb-4 justify-center">
+                 {[1, 2, 3, 4, 5].map((star) => (
+                    <AsyncButton key={star} onClick={() => setEditingReview({...editingReview, rating: star})}>
+                       <Star size={32} className={star <= editingReview.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"} />
+                    </AsyncButton>
+                 ))}
+              </div>
+              
+              <textarea 
+                 value={editingReview.comment} 
+                 onChange={(e) => setEditingReview({...editingReview, comment: e.target.value})}
+                 className="w-full p-3 border rounded-xl h-32 mb-4"
+                 placeholder="Write your experience..."
+              />
+              
+              <AsyncButton onClick={handleUpdateReview} disabled={loading} className="w-full bg-black text-white py-3 rounded-xl font-bold">
+                 {loading ? "Saving..." : "Update Review"}
+              </AsyncButton>
+           </div>
+        </div>
       )}
 
     </div>

@@ -1,19 +1,34 @@
 import { prisma } from "@/lib/prisma";
 import AsyncButton from "@/components/ui/AsyncButton";
+import SpecialistActions from "./SpecialistActions"; // Import the new component
+import { Search } from "lucide-react"; // Import icon
 
-export default async function AdminSpecialists() {
+// ✅ FIX: Accept searchParams prop
+export default async function AdminSpecialists({ 
+  searchParams 
+}: { 
+  searchParams: { q?: string; cat?: string } 
+}) {
+  
+  // 1. Build Filter Query
+  const query: any = {};
+  if (searchParams.q) {
+    query.name = { contains: searchParams.q, mode: 'insensitive' };
+  }
+  if (searchParams.cat && searchParams.cat !== 'all') {
+    query.category = searchParams.cat;
+  }
+
+  // 2. Fetch with Filters
   const specialists = await prisma.specialist.findMany({
-    orderBy: {
-      id: 'desc' // Sorted by ID (Newest first)
-    }
+    where: query,
+    orderBy: { id: 'desc' }
   });
 
-  // Calculate stats
-  const totalSpecialists = specialists.length;
-  const featuredSpecialists = specialists.filter(s => s.isFeatured).length;
-  
-  // FIX: Changed 'isActive' to 'isVerified' to match your Schema
-  const activeSpecialists = specialists.filter(s => s.isVerified).length;
+  // Calculate stats (based on total DB, not filtered view ideally, but this is fine for MVP)
+  const allSpecs = await prisma.specialist.count();
+  const featured = await prisma.specialist.count({ where: { isFeatured: true } });
+  const verified = await prisma.specialist.count({ where: { isVerified: true } });
 
   const getCategoryBadge = (category: string) => {
     const categoryMap: Record<string, { color: string; bg: string }> = {
@@ -22,7 +37,6 @@ export default async function AdminSpecialists() {
       'SPEECH_THERAPIST': { color: 'text-purple-700', bg: 'bg-purple-100' },
       'DIETITIAN': { color: 'text-yellow-700', bg: 'bg-yellow-100' }
     };
-    
     return categoryMap[category] || { color: 'text-gray-700', bg: 'bg-gray-100' };
   };
 
@@ -31,69 +45,48 @@ export default async function AdminSpecialists() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Specialist Management</h1>
-        <p className="text-gray-600">Manage healthcare providers and their profiles</p>
+        <p className="text-gray-600">Verify, feature, and manage doctor profiles.</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-xl p-6 shadow-soft border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Total Specialists</p>
-              <p className="text-3xl font-bold text-gray-900">{totalSpecialists}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">👨‍⚕️</span>
-            </div>
-          </div>
+        <div className="bg-white rounded-xl p-6 shadow-soft border border-gray-200 flex items-center justify-between">
+           <div><p className="text-sm text-gray-500 mb-1">Total Specialists</p><p className="text-3xl font-bold text-gray-900">{allSpecs}</p></div>
+           <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-2xl">👨‍⚕️</div>
         </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-soft border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Featured</p>
-              <p className="text-3xl font-bold text-yellow-600">{featuredSpecialists}</p>
-            </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">⭐</span>
-            </div>
-          </div>
+        <div className="bg-white rounded-xl p-6 shadow-soft border border-gray-200 flex items-center justify-between">
+           <div><p className="text-sm text-gray-500 mb-1">Featured</p><p className="text-3xl font-bold text-yellow-600">{featured}</p></div>
+           <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center text-2xl">⭐</div>
         </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-soft border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              {/* FIX: Label changed to Verified */}
-              <p className="text-sm text-gray-500 mb-1">Verified</p>
-              <p className="text-3xl font-bold text-green-600">{activeSpecialists}</p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">✅</span>
-            </div>
-          </div>
+        <div className="bg-white rounded-xl p-6 shadow-soft border border-gray-200 flex items-center justify-between">
+           <div><p className="text-sm text-gray-500 mb-1">Verified</p><p className="text-3xl font-bold text-green-600">{verified}</p></div>
+           <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-2xl">✅</div>
         </div>
       </div>
 
-      {/* Actions Bar */}
-      <div className="bg-white rounded-xl p-4 mb-6 shadow-soft border border-gray-200 flex justify-between items-center">
-        <div className="flex gap-3">
-          <input 
-            type="text" 
-            placeholder="Search specialists..."
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500 w-64"
-          />
-          <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500">
-            <option value="all">All Categories</option>
-            <option value="PHYSIOTHERAPIST">Physiotherapist</option>
-            <option value="NUTRITIONIST">Nutritionist</option>
-            <option value="SPEECH_THERAPIST">Speech Therapist</option>
-            <option value="DIETITIAN">Dietitian</option>
-          </select>
-        </div>
-        <AsyncButton className="px-6 py-2.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg font-medium transition-all hover:-translate-y-0.5 flex items-center gap-2">
-          <span>+</span>
-          <span>Add Specialist</span>
-        </AsyncButton>
+      {/* Search & Filter Bar */}
+      <div className="bg-white rounded-xl p-4 mb-6 shadow-soft border border-gray-200">
+        <form className="flex flex-col md:flex-row gap-3">
+           <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                name="q"
+                defaultValue={searchParams.q}
+                placeholder="Search by name..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+              />
+           </div>
+           <select name="cat" defaultValue={searchParams.cat} className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none">
+             <option value="all">All Categories</option>
+             <option value="PHYSIOTHERAPIST">Physiotherapist</option>
+             <option value="NUTRITIONIST">Nutritionist</option>
+             <option value="SPEECH_THERAPIST">Speech Therapist</option>
+             <option value="DIETITIAN">Dietitian</option>
+           </select>
+           <button type="submit" className="bg-black text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors">
+             Filter
+           </button>
+        </form>
       </div>
 
       {/* Specialists Table */}
@@ -102,12 +95,11 @@ export default async function AdminSpecialists() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Specialist</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Experience</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fee</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase">Specialist</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase">Category</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase">Stats</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -117,12 +109,14 @@ export default async function AdminSpecialists() {
                   <tr key={specialist.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-brand-500 to-brand-600 rounded-lg flex items-center justify-center text-white font-semibold">
-                          {specialist.name.charAt(0)}
+                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 font-bold overflow-hidden">
+                           {specialist.image ? (
+                             <img src={specialist.image} alt={specialist.name} className="w-full h-full object-cover" />
+                           ) : specialist.name.charAt(0)}
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">{specialist.name}</p>
-                          <p className="text-xs text-gray-500">ID: {specialist.id}</p>
+                          <p className="text-xs text-gray-500">{specialist.experience} Yrs Exp.</p>
                         </div>
                       </div>
                     </td>
@@ -132,39 +126,17 @@ export default async function AdminSpecialists() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-900">
-                        {specialist.experience} years
-                      </span>
+                      <span className="text-sm text-gray-900 font-medium">₹{specialist.price}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-gray-900">
-                        ₹{specialist.price}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <span className={`px-2 py-1 rounded text-xs font-medium w-fit ${specialist.isFeatured ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                          {specialist.isFeatured ? 'Featured' : 'Regular'}
-                        </span>
-                        
-                        {/* FIX: Using 'isVerified' instead of 'isActive' */}
-                        <span className={`px-2 py-1 rounded text-xs font-medium w-fit ${specialist.isVerified ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                       {/* Status Logic handled by Actions Component visual feedback */}
+                       <span className={`px-2 py-1 rounded text-xs font-bold ${specialist.isVerified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                           {specialist.isVerified ? 'Verified' : 'Pending'}
-                        </span>
-                      </div>
+                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <AsyncButton className="px-3 py-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg transition-colors">
-                          View
-                        </AsyncButton>
-                        <AsyncButton className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors">
-                          Edit
-                        </AsyncButton>
-                        <AsyncButton className="px-3 py-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition-colors">
-                          Delete
-                        </AsyncButton>
-                      </div>
+                      {/* ✅ NEW: Interactive Actions Component */}
+                      <SpecialistActions specialist={specialist} />
                     </td>
                   </tr>
                 );
@@ -174,13 +146,8 @@ export default async function AdminSpecialists() {
         </div>
         
         {specialists.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">👨‍⚕️</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Specialists Found</h3>
-            <p className="text-gray-600 mb-6">Add healthcare specialists to start accepting appointments.</p>
-            <AsyncButton className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-lg font-medium transition-all hover:-translate-y-0.5">
-              + Add First Specialist
-            </AsyncButton>
+          <div className="text-center py-12 text-gray-500">
+            No specialists found matching your search.
           </div>
         )}
       </div>

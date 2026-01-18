@@ -15,12 +15,12 @@ export default async function SpecialistDetailsPage({
   const session = await getServerSession(authOptions);
   const userRole = (session?.user as any)?.role;
 
-  // 2. Fetch Doctor Data with RICH PROFILE
+  // 2. Fetch Doctor Data
   const specialist = await prisma.specialist.findUnique({
     where: { id: Number(params.id) },
     include: {
       clinics: true,
-      reviews: { include: { user: true } }, // Fetch reviewer details
+      reviews: { include: { user: true } },
       educations: true,
       awards: true,
       languages: true,
@@ -37,17 +37,18 @@ export default async function SpecialistDetailsPage({
     return <div className="p-12 text-center text-gray-500">Specialist not found.</div>;
   }
 
-  // 3. RESTRICTION CHECK (Keep your existing logic)
-  if (session && (userRole === 'ADMIN' || userRole === 'SPECIALIST')) {
+  // 3. RESTRICTION CHECK (Fixed)
+  // ✅ FIX: Removed 'ADMIN' from here. Admins can now view the page.
+  // Only Specialists are blocked from viewing other specialists (to prevent confusion).
+  if (session && userRole === 'SPECIALIST') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
         <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md text-center border border-gray-100">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Restricted</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Doctor Account Detected</h2>
           <p className="text-gray-500 mb-6 text-sm">
-            You are currently logged in as a <strong>{userRole}</strong>. 
-            <br/>To book, please log in with a <strong>Patient Account</strong>.
+            Please log in with a <strong>Patient Account</strong> to book appointments.
           </p>
-          <Link href={userRole === 'ADMIN' ? "/dashboard/admin" : "/dashboard/doctor"} className="bg-black text-white px-6 py-3 rounded-xl font-bold">
+          <Link href="/dashboard/doctor" className="bg-black text-white px-6 py-3 rounded-xl font-bold">
              Return to Dashboard
           </Link>
         </div>
